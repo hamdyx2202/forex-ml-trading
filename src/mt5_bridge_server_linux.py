@@ -15,11 +15,20 @@ import os
 import sys
 from typing import Dict, List, Optional
 
+# تكوين Flask لقبول أي content-type
+class FlexibleRequest(Flask):
+    def make_default_options_response(self):
+        rv = super().make_default_options_response()
+        rv.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+        return rv
+
 # إضافة المسار
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, resources={r"/*": {"origins": "*"}})
+app.config['JSON_AS_ASCII'] = False
+app.config['JSONIFY_MIMETYPE'] = 'application/json'
 
 class SimpleBridgeServer:
     """خادم مبسط يعمل على Linux بدون MT5"""
@@ -257,35 +266,58 @@ def test():
     
     return jsonify(response)
 
+@app.route('/echo', methods=['POST'])
+def echo():
+    """Echo endpoint - returns exactly what was sent"""
+    raw_data = request.get_data(as_text=True)
+    
+    # Try to parse as JSON and echo back
+    try:
+        data = json.loads(raw_data)
+        return jsonify({
+            "received": data,
+            "echo": data,
+            "status": "ok"
+        })
+    except:
+        return jsonify({
+            "received_raw": raw_data,
+            "status": "raw_data"
+        })
+
 @app.route('/get_signal', methods=['POST'])
 def get_signal():
     """استقبال طلب الإشارة من MT5"""
     try:
-        # محاولة قراءة JSON
+        # قراءة البيانات الخام أولاً
+        raw_data = request.get_data(as_text=True)
+        logger.info(f"Raw data received: {raw_data}")
+        
         data = None
         
-        # جرب request.json أولاً
-        if request.is_json:
-            data = request.get_json(force=True)
-        
-        # إذا فشل، جرب كـ text
-        if not data:
-            raw_data = request.get_data(as_text=True)
-            logger.info(f"Raw data received: {raw_data}")
-            
-            # محاولة parse يدوياً
-            if raw_data:
+        # محاولة parse كـ JSON
+        if raw_data:
+            try:
+                data = json.loads(raw_data)
+                logger.info(f"Parsed JSON data: {data}")
+            except json.JSONDecodeError as e:
+                logger.warning(f"JSON decode error: {e}")
+                # محاولة أخرى مع force
                 try:
-                    import json
-                    data = json.loads(raw_data)
-                except Exception as parse_error:
-                    logger.warning(f"JSON parse error: {parse_error}")
-                    # قيم افتراضية
-                    data = {"symbol": "EURUSDm", "price": 1.1000}
+                    data = request.get_json(force=True, silent=True)
+                except:
+                    pass
         
-        # إذا لم نحصل على بيانات
+        # إذا فشل كل شيء، جرب request.json
         if not data:
-            logger.warning("No data received, using defaults")
+            try:
+                data = request.get_json(force=True, silent=True)
+            except:
+                data = None
+        
+        # قيم افتراضية إذا فشل كل شيء
+        if not data:
+            logger.warning("Could not parse data, using defaults")
             data = {"symbol": "EURUSDm", "price": 1.1000}
         
         # استخراج البيانات
@@ -301,8 +333,8 @@ def get_signal():
         return jsonify(signal)
         
     except Exception as e:
-        logger.error(f"Error in get_signal: {e}")
-        # IMPORTANT: Always return a response
+        logger.error(f"Error in get_signal: {str(e)}", exc_info=True)
+        # Always return valid response
         return jsonify({
             "action": "NO_TRADE",
             "confidence": 0.0,
@@ -310,7 +342,7 @@ def get_signal():
             "tp": 0.0,
             "lot": 0.01,
             "error": str(e)
-        }), 200  # Return 200 to avoid EA errors
+        }), 200
 
 @app.route('/confirm_trade', methods=['POST'])
 def confirm_trade():
