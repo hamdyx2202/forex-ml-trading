@@ -26,11 +26,17 @@ except ImportError:
     logger.warning("Trader module not available on Linux")
     Trader = None
 
+# Use Linux-compatible data collector
 try:
-    from src.data_collector import MT5DataCollector
+    from src.data_collector_linux import MT5DataCollector
+    logger.info("Using Linux-compatible data collector")
 except ImportError:
-    logger.warning("MT5DataCollector not available on Linux")
-    MT5DataCollector = None
+    try:
+        from src.data_collector import MT5DataCollector
+        logger.info("Using standard data collector")
+    except ImportError:
+        logger.warning("No data collector available")
+        MT5DataCollector = None
 
 from src.feature_engineer import FeatureEngineer
 from src.model_trainer import ModelTrainer

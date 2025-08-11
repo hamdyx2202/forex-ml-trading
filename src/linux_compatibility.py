@@ -73,10 +73,27 @@ class MT5Mock:
     def copy_rates_range(self, symbol, timeframe, date_from, date_to):
         """Mock historical data"""
         # إنشاء بيانات وهمية للاختبار
-        periods = int((date_to - date_from).total_seconds() / 3600)  # عدد الساعات
+        periods = min(1000, int((date_to - date_from).total_seconds() / 3600))  # عدد الساعات
+        
+        if periods <= 0:
+            return None
+            
         times = pd.date_range(start=date_from, end=date_to, freq='H')[:periods]
         
-        data = []
+        # إنشاء numpy array مباشرة
+        dtype = np.dtype([
+            ('time', 'i8'), 
+            ('open', 'f8'), 
+            ('high', 'f8'), 
+            ('low', 'f8'), 
+            ('close', 'f8'), 
+            ('tick_volume', 'i8'),
+            ('spread', 'i4'), 
+            ('real_volume', 'i8')
+        ])
+        
+        data = np.zeros(len(times), dtype=dtype)
+        
         base_price = 1.1000
         for i, t in enumerate(times):
             open_price = base_price + np.sin(i/10) * 0.01 + np.random.rand() * 0.001
@@ -84,22 +101,18 @@ class MT5Mock:
             low = open_price - np.random.rand() * 0.0005
             close = np.random.uniform(low, high)
             
-            data.append({
-                'time': int(t.timestamp()),
-                'open': open_price,
-                'high': high,
-                'low': low,
-                'close': close,
-                'tick_volume': int(1000 + np.random.rand() * 500),
-                'spread': 2,
-                'real_volume': 0
-            })
+            data[i] = (
+                int(t.timestamp()),
+                open_price,
+                high,
+                low,
+                close,
+                int(1000 + np.random.rand() * 500),
+                2,
+                0
+            )
         
-        return np.array(data, dtype=[
-            ('time', 'i8'), ('open', 'f8'), ('high', 'f8'), 
-            ('low', 'f8'), ('close', 'f8'), ('tick_volume', 'i8'),
-            ('spread', 'i4'), ('real_volume', 'i8')
-        ])
+        return data
     
     def copy_rates_from_pos(self, *args):
         return None
