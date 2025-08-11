@@ -1,0 +1,18 @@
+[Unit]
+Description=MT5 Bridge Server for Forex ML Trading
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/forex-ml-trading
+Environment="PATH=/home/ubuntu/forex-ml-trading/venv/bin"
+ExecStart=/home/ubuntu/forex-ml-trading/venv/bin/python src/mt5_bridge_server.py
+Restart=always
+RestartSec=10
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=mt5-bridge
+
+[Install]
+WantedBy=multi-user.target
