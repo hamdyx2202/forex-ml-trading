@@ -298,13 +298,26 @@ def get_signal():
         # محاولة parse كـ JSON
         if raw_data:
             try:
-                data = json.loads(raw_data)
+                # تنظيف البيانات من الأحرف الإضافية
+                cleaned_data = raw_data.strip()
+                # إزالة أي null bytes أو أحرف غير مرئية
+                cleaned_data = cleaned_data.rstrip('\x00').rstrip()
+                
+                data = json.loads(cleaned_data)
                 logger.info(f"Parsed JSON data: {data}")
             except json.JSONDecodeError as e:
                 logger.warning(f"JSON decode error: {e}")
-                # محاولة أخرى مع force
+                logger.warning(f"Raw data bytes: {raw_data.encode()}")
+                
+                # محاولة استخراج JSON من البيانات
                 try:
-                    data = request.get_json(force=True, silent=True)
+                    # البحث عن بداية ونهاية JSON
+                    start = raw_data.find('{')
+                    end = raw_data.rfind('}') + 1
+                    if start >= 0 and end > start:
+                        json_str = raw_data[start:end]
+                        data = json.loads(json_str)
+                        logger.info(f"Extracted JSON: {data}")
                 except:
                     pass
         
