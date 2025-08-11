@@ -4,16 +4,42 @@ Forex ML Trading Bot - Main Entry Point
 """
 
 import sys
+import os
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+# Linux compatibility first
+try:
+    import src.linux_compatibility
+except:
+    pass
+
 import argparse
 import asyncio
 from loguru import logger
-from src.trader import Trader
-from src.data_collector import MT5DataCollector
-from src.feature_engineer import FeatureEngineer
-from src.model_trainer import ModelTrainer
-from src.monitor import TradingMonitor
 import warnings
 warnings.filterwarnings('ignore')
+
+# Conditional imports with error handling
+try:
+    from src.trader import Trader
+except ImportError:
+    logger.warning("Trader module not available on Linux")
+    Trader = None
+
+try:
+    from src.data_collector import MT5DataCollector
+except ImportError:
+    logger.warning("MT5DataCollector not available on Linux")
+    MT5DataCollector = None
+
+from src.feature_engineer import FeatureEngineer
+from src.model_trainer import ModelTrainer
+
+try:
+    from src.monitor import TradingMonitor
+except ImportError:
+    logger.warning("TradingMonitor not available")
+    TradingMonitor = None
 
 
 def setup_logging():
@@ -116,24 +142,79 @@ async def start_telegram_bot():
 
 def test_connection():
     """اختبار الاتصال بـ MT5"""
-    logger.info("Testing MT5 connection...")
-    collector = MT5DataCollector()
+    logger.info("Testing connection...")
     
-    if collector.connect_mt5():
-        logger.info("✅ Successfully connected to MT5")
+    # على Linux، نختبر قاعدة البيانات فقط
+    import platform
+    if platform.system() == 'Linux':
+        logger.info("Running on Linux - Testing database setup...")
         
-        # Get account info
-        import MetaTrader5 as mt5
-        account_info = mt5.account_info()
-        if account_info:
-            logger.info(f"Account: {account_info.login}")
-            logger.info(f"Server: {account_info.server}")
-            logger.info(f"Balance: ${account_info.balance:.2f}")
-            logger.info(f"Leverage: 1:{account_info.leverage}")
+        import sqlite3
+        from pathlib import Path
         
-        collector.disconnect_mt5()
+        # إنشاء مجلدات البيانات
+        Path("data").mkdir(exist_ok=True)
+        Path("models").mkdir(exist_ok=True)
+        Path("logs").mkdir(exist_ok=True)
+        
+        # إنشاء قاعدة البيانات
+        try:
+            conn = sqlite3.connect("data/forex_ml.db")
+            cursor = conn.cursor()
+            
+            # إنشاء الجداول الأساسية
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS price_data (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    symbol TEXT NOT NULL,
+                    timeframe TEXT NOT NULL,
+                    time INTEGER NOT NULL,
+                    open REAL NOT NULL,
+                    high REAL NOT NULL,
+                    low REAL NOT NULL,
+                    close REAL NOT NULL,
+                    volume REAL NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            
+            conn.commit()
+            conn.close()
+            
+            logger.info("✅ Database created successfully")
+            logger.info("✅ System ready for Linux operation")
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ Database error: {e}")
+            return False
+    
+    # على Windows مع MT5
+    if MT5DataCollector:
+        collector = MT5DataCollector()
+        
+        if collector.connect_mt5():
+            logger.info("✅ Successfully connected to MT5")
+            
+            try:
+                import MetaTrader5 as mt5
+                account_info = mt5.account_info()
+                if account_info:
+                    logger.info(f"Account: {account_info.login}")
+                    logger.info(f"Server: {account_info.server}")
+                    logger.info(f"Balance: ${account_info.balance:.2f}")
+                    logger.info(f"Leverage: 1:{account_info.leverage}")
+            except:
+                pass
+            
+            collector.disconnect_mt5()
+            return True
+        else:
+            logger.error("❌ Failed to connect to MT5")
+            return False
     else:
-        logger.error("❌ Failed to connect to MT5")
+        logger.info("❌ MT5 not available on this system")
+        return False
 
 
 def main():

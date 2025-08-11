@@ -3,11 +3,17 @@
     "pairs": ["EURUSD", "GBPUSD", "XAUUSD"],
     "timeframes": ["M5", "M15", "H1", "H4", "D1"],
     "max_positions": 3,
-    "risk_per_trade": 0.01,
-    "max_daily_loss": 0.03,
     "min_confidence": 0.7,
     "stop_loss_atr_multiplier": 2.0,
     "take_profit_ratio": 1.5
+  },
+  
+  "risk": {
+    "max_risk_per_trade": 0.01,
+    "max_daily_loss": 0.03,
+    "max_drawdown": 0.10,
+    "risk_reward_ratio": 1.5,
+    "max_correlation": 0.7
   },
   
   "mt5": {
@@ -41,7 +47,7 @@
   },
   
   "database": {
-    "path": "data/trading.db",
+    "path": "data/forex_ml.db",
     "backup_interval": 86400
   }
 }
