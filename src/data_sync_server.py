@@ -83,7 +83,23 @@ def health_check():
     return jsonify({
         "status": "healthy",
         "service": "ForexML Data Sync Server",
-        "timestamp": datetime.now().isoformat()
+        "timestamp": datetime.now().isoformat(),
+        "mode": "Data Sync Mode"
+    })
+
+@app.route('/', methods=['GET'])
+def index():
+    """الصفحة الرئيسية"""
+    return jsonify({
+        "service": "ForexML Data Sync Server",
+        "status": "running",
+        "endpoints": [
+            "/health",
+            "/api/test",
+            "/api/historical_data",
+            "/api/live_data",
+            "/api/stats"
+        ]
     })
 
 @app.route('/api/test', methods=['POST'])

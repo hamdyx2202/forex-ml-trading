@@ -285,6 +285,145 @@ def echo():
             "status": "raw_data"
         })
 
+@app.route('/api/test', methods=['POST'])
+def api_test():
+    """API test endpoint for EA connection testing"""
+    try:
+        data = request.get_json(force=True)
+        api_key = data.get('api_key', '')
+        
+        return jsonify({
+            "status": "success",
+            "message": "Connection successful",
+            "api_key_received": api_key,
+            "timestamp": datetime.now().isoformat(),
+            "server": "MT5 Bridge Server Linux"
+        })
+    except Exception as e:
+        logger.error(f"API test error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/historical_data', methods=['POST'])
+def receive_historical_data():
+    """Receive historical data from EA"""
+    try:
+        data = request.get_json(force=True)
+        
+        symbol = data.get('symbol')
+        timeframe = data.get('timeframe')
+        bars_data = data.get('data', [])
+        
+        if not symbol or not timeframe or not bars_data:
+            return jsonify({"error": "Missing required fields"}), 400
+        
+        # Save to database
+        saved_count = save_historical_data(symbol, timeframe, bars_data)
+        
+        logger.info(f"Historical data: {symbol} {timeframe} - {len(bars_data)} bars, saved: {saved_count}")
+        
+        return jsonify({
+            "status": "success",
+            "received": len(bars_data),
+            "saved": saved_count,
+            "symbol": symbol,
+            "timeframe": timeframe
+        })
+        
+    except Exception as e:
+        logger.error(f"Historical data error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/live_data', methods=['POST'])
+def receive_live_data():
+    """Receive live data updates from EA"""
+    try:
+        data = request.get_json(force=True)
+        
+        symbol = data.get('symbol')
+        timeframe = data.get('timeframe')
+        bars_data = data.get('data', [])
+        
+        if not symbol or not timeframe or not bars_data:
+            return jsonify({"error": "Missing required fields"}), 400
+        
+        # Update price history
+        key = f"{symbol}_{timeframe}"
+        if hasattr(bridge, 'price_history'):
+            bridge.price_history[key] = bars_data[-100:]  # Keep last 100 bars
+        
+        logger.info(f"Live data update: {symbol} {timeframe} - {len(bars_data)} bars")
+        
+        return jsonify({
+            "status": "success",
+            "received": len(bars_data),
+            "symbol": symbol,
+            "timeframe": timeframe
+        })
+        
+    except Exception as e:
+        logger.error(f"Live data error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+def save_historical_data(symbol: str, timeframe: str, bars_data: list) -> int:
+    """Save historical data to database"""
+    try:
+        import sqlite3
+        from pathlib import Path
+        
+        Path("data").mkdir(exist_ok=True)
+        
+        conn = sqlite3.connect("data/forex_ml.db")
+        cursor = conn.cursor()
+        
+        # Create table if not exists
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS price_data (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                symbol TEXT NOT NULL,
+                timeframe TEXT NOT NULL,
+                time INTEGER NOT NULL,
+                open REAL NOT NULL,
+                high REAL NOT NULL,
+                low REAL NOT NULL,
+                close REAL NOT NULL,
+                volume INTEGER NOT NULL,
+                spread INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(symbol, timeframe, time)
+            )
+        """)
+        
+        saved_count = 0
+        for bar in bars_data:
+            try:
+                cursor.execute("""
+                    INSERT OR REPLACE INTO price_data 
+                    (symbol, timeframe, time, open, high, low, close, volume, spread)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    symbol,
+                    timeframe,
+                    int(bar['time']),
+                    float(bar['open']),
+                    float(bar['high']),
+                    float(bar['low']),
+                    float(bar['close']),
+                    int(bar['volume']),
+                    int(bar.get('spread', 0))
+                ))
+                saved_count += 1
+            except Exception as e:
+                logger.debug(f"Skip bar: {e}")
+        
+        conn.commit()
+        conn.close()
+        
+        return saved_count
+        
+    except Exception as e:
+        logger.error(f"Database error: {e}")
+        return 0
+
 @app.route('/get_signal', methods=['POST'])
 def get_signal():
     """استقبال طلب الإشارة من MT5"""
