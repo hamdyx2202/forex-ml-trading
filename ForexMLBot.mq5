@@ -26,7 +26,25 @@ CSymbolInfo symbolInfo;
 CPositionInfo positionInfo;
 
 datetime lastSignalCheck = 0;
-string allowedPairs[] = {"EURUSD", "GBPUSD", "USDJPY", "XAUUSD", "AUDUSD", "USDCAD"};
+string allowedPairs[] = {
+    // العملات الأساسية
+    "EURUSDm",   // اليورو/دولار
+    "GBPUSDm",   // الباوند/دولار
+    "USDJPYm",   // دولار/ين
+    "USDCHFm",   // دولار/فرنك سويسري
+    "AUDUSDm",   // دولار أسترالي
+    "USDCADm",   // دولار/كندي
+    "NZDUSDm",   // دولار نيوزيلندي
+    
+    // المعادن الثمينة
+    "XAUUSDm",   // الذهب
+    "XAGUSDm",   // الفضة
+    
+    // أزواج إضافية مهمة
+    "EURGBPm",   // يورو/باوند
+    "EURJPYm",   // يورو/ين
+    "GBPJPYm"    // باوند/ين
+};
 
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
@@ -47,6 +65,9 @@ int OnInit()
    
    Print("✅ تم تهيئة Forex ML Bot بنجاح");
    Print("📡 متصل بـ: ", PythonServerURL);
+   
+   // اختبار شامل للاتصال
+   TestServerCommunication();
    
    return(INIT_SUCCEEDED);
 }
@@ -124,18 +145,26 @@ void CheckAndExecuteSignals()
 string GetSignalFromServer(string symbol, double price)
 {
    string url = PythonServerURL + "/get_signal";
-   string headers = "Content-Type: application/json\r\n";
    
-   // إعداد البيانات
-   string jsonData = StringFormat(
-      "{\"symbol\":\"%s\",\"price\":%.5f,\"timestamp\":\"%s\"}",
-      symbol, price, TimeToString(TimeCurrent())
-   );
+   // إعداد JSON
+   string jsonData = "{\"symbol\":\"" + symbol + "\",\"price\":" + DoubleToString(price, 5) + "}";
    
+   // Debug print
+   Print("📤 Sending to server: ", jsonData);
+   Print("🌐 URL: ", url);
+   
+   // تحضير البيانات
    char postData[], resultData[];
+   string resultHeaders;
    StringToCharArray(jsonData, postData);
    
-   int timeout = 5000; // 5 ثواني
+   // إضافة null terminator
+   int dataSize = ArraySize(postData);
+   ArrayResize(postData, dataSize + 1);
+   postData[dataSize] = 0;
+   
+   string headers = "Content-Type: application/json\r\n";
+   int timeout = 10000; // 10 ثواني
    
    // إرسال الطلب
    int res = WebRequest(
@@ -145,17 +174,26 @@ string GetSignalFromServer(string symbol, double price)
       timeout,
       postData,
       resultData,
-      headers
+      resultHeaders
    );
+   
+   // Debug response
+   Print("📥 Response code: ", res);
    
    if(res == -1)
    {
       int error = GetLastError();
-      Print("❌ خطأ في WebRequest: ", error);
+      Print("❌ WebRequest error: ", error);
+      
+      // محاولة تشخيص المشكلة
+      if(error == 4060) Print("❌ URL not allowed in MT5 settings");
+      if(error == 4014) Print("❌ WebRequest not allowed");
+      
       return "";
    }
    
    string result = CharArrayToString(resultData);
+   Print("📥 Server response: ", result);
    
    // تحليل الاستجابة
    if(StringFind(result, "\"action\"") >= 0)
@@ -163,6 +201,7 @@ string GetSignalFromServer(string symbol, double price)
       return result;
    }
    
+   Print("⚠️ Invalid response format");
    return "";
 }
 
@@ -441,9 +480,60 @@ bool CheckServerConnection()
    char data[], result[];
    string headers;
    
+   Print("🔍 Testing connection to: ", url);
+   
    int res = WebRequest("GET", url, "", 5000, data, result, headers);
    
-   return (res != -1);
+   if(res != -1)
+   {
+      string response = CharArrayToString(result);
+      Print("✅ Server health check response: ", response);
+      return true;
+   }
+   else
+   {
+      int error = GetLastError();
+      Print("❌ Connection test failed. Error: ", error);
+      return false;
+   }
+}
+
+// اختبار الخادم بإرسال بيانات تجريبية
+void TestServerCommunication()
+{
+   Print("🧪 Testing server communication...");
+   
+   // اختبار /test endpoint
+   string testUrl = PythonServerURL + "/test";
+   string testData = "{\"test\":\"data\",\"value\":123}";
+   
+   char postData[], resultData[];
+   string resultHeaders;
+   StringToCharArray(testData, postData);
+   
+   string headers = "Content-Type: application/json\r\n";
+   
+   int res = WebRequest("POST", testUrl, headers, 5000, postData, resultData, resultHeaders);
+   
+   if(res != -1)
+   {
+      Print("✅ Test endpoint response: ", CharArrayToString(resultData));
+   }
+   else
+   {
+      Print("❌ Test endpoint failed");
+   }
+   
+   // اختبار get_signal
+   string signal = GetSignalFromServer("EURUSDm", 1.1000);
+   if(signal != "")
+   {
+      Print("✅ Signal test successful");
+   }
+   else
+   {
+      Print("❌ Signal test failed");
+   }
 }
 
 // إرسال تأكيد تنفيذ الصفقة

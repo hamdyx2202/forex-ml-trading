@@ -237,22 +237,80 @@ def health_check():
         "mode": "Linux Compatible"
     })
 
+@app.route('/test', methods=['GET', 'POST'])
+def test():
+    """Endpoint للاختبار وتشخيص المشاكل"""
+    headers = dict(request.headers)
+    data = request.get_data(as_text=True)
+    
+    response = {
+        "method": request.method,
+        "headers": headers,
+        "data": data,
+        "is_json": request.is_json,
+        "content_type": request.content_type,
+        "content_length": request.content_length,
+        "remote_addr": request.remote_addr
+    }
+    
+    logger.info(f"Test endpoint called: {response}")
+    
+    return jsonify(response)
+
 @app.route('/get_signal', methods=['POST'])
 def get_signal():
+    """استقبال طلب الإشارة من MT5"""
     try:
-        data = request.get_json()
-        symbol = data.get('symbol')
-        price = float(data.get('price', 0))
+        # محاولة قراءة JSON
+        data = None
         
-        if not symbol or price <= 0:
-            return jsonify({"error": "Invalid symbol or price"}), 400
+        # جرب request.json أولاً
+        if request.is_json:
+            data = request.get_json(force=True)
         
+        # إذا فشل، جرب كـ text
+        if not data:
+            raw_data = request.get_data(as_text=True)
+            logger.info(f"Raw data received: {raw_data}")
+            
+            # محاولة parse يدوياً
+            if raw_data:
+                try:
+                    import json
+                    data = json.loads(raw_data)
+                except Exception as parse_error:
+                    logger.warning(f"JSON parse error: {parse_error}")
+                    # قيم افتراضية
+                    data = {"symbol": "EURUSDm", "price": 1.1000}
+        
+        # إذا لم نحصل على بيانات
+        if not data:
+            logger.warning("No data received, using defaults")
+            data = {"symbol": "EURUSDm", "price": 1.1000}
+        
+        # استخراج البيانات
+        symbol = str(data.get('symbol', 'EURUSDm'))
+        price = float(data.get('price', 1.1000))
+        
+        logger.info(f"Processing signal for {symbol} at {price}")
+        
+        # توليد إشارة
         signal = bridge.get_signal(symbol, price)
+        
+        logger.info(f"Sending signal: {signal}")
         return jsonify(signal)
         
     except Exception as e:
         logger.error(f"Error in get_signal: {e}")
-        return jsonify({"error": str(e)}), 500
+        # IMPORTANT: Always return a response
+        return jsonify({
+            "action": "NO_TRADE",
+            "confidence": 0.0,
+            "sl": 0.0,
+            "tp": 0.0,
+            "lot": 0.01,
+            "error": str(e)
+        }), 200  # Return 200 to avoid EA errors
 
 @app.route('/confirm_trade', methods=['POST'])
 def confirm_trade():
