@@ -4,6 +4,17 @@ MT5 Bridge Server - خادم API للتواصل مع Expert Advisor
 يستقبل طلبات من EA ويرد بإشارات التداول من نظام ML
 """
 
+# Import Linux compatibility first
+import os
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# تحميل التوافق مع Linux أولاً
+try:
+    import src.linux_compatibility
+except:
+    pass
+
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import json
@@ -14,18 +25,20 @@ import time
 from typing import Dict, List, Optional
 import pandas as pd
 import numpy as np
-import os
-import sys
 
-# إضافة المسار للوصول للملفات
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
+# محاولة استيراد المكونات مع معالجة الأخطاء
 from src.predictor import Predictor
 from src.risk_manager import RiskManager
-from src.data_collector import MT5DataCollector
 from src.feature_engineer import FeatureEngineer
 from src.continuous_learner import ContinuousLearner
 from src.advanced_learner import AdvancedLearner
+
+# محاولة استيراد data_collector
+try:
+    from src.data_collector import MT5DataCollector
+except ImportError:
+    logger.warning("MT5DataCollector not available on Linux - using mock mode")
+    MT5DataCollector = None
 
 app = Flask(__name__)
 CORS(app)  # السماح بطلبات من MT5
@@ -40,7 +53,17 @@ class MT5BridgeServer:
         # تهيئة المكونات
         self.predictor = Predictor(config_path)
         self.risk_manager = RiskManager(config_path)
-        self.data_collector = MT5DataCollector(config_path)
+        
+        # MT5DataCollector اختياري على Linux
+        if MT5DataCollector:
+            try:
+                self.data_collector = MT5DataCollector(config_path)
+            except Exception as e:
+                logger.warning(f"Could not initialize MT5DataCollector: {e}")
+                self.data_collector = None
+        else:
+            self.data_collector = None
+            
         self.feature_engineer = FeatureEngineer(config_path)
         self.continuous_learner = ContinuousLearner(config_path)
         self.advanced_learner = AdvancedLearner(config_path)
@@ -69,7 +92,10 @@ class MT5BridgeServer:
         """حلقة تحديث البيانات"""
         while True:
             try:
-                self.data_collector.update_all_pairs()
+                if self.data_collector:
+                    self.data_collector.update_all_pairs()
+                else:
+                    logger.info("Data collector not available - skipping update")
                 time.sleep(300)  # 5 دقائق
             except Exception as e:
                 logger.error(f"Error updating data: {e}")
@@ -186,12 +212,16 @@ class MT5BridgeServer:
     def _get_current_atr(self, symbol: str) -> float:
         """الحصول على ATR الحالي"""
         try:
-            df = self.data_collector.get_latest_data(symbol, "H1", limit=100)
-            if df.empty:
-                return 0.001  # قيمة افتراضية
-            
-            df = self.feature_engineer.add_technical_indicators(df)
-            return df['atr_14'].iloc[-1]
+            if self.data_collector:
+                df = self.data_collector.get_latest_data(symbol, "H1", limit=100)
+                if df.empty:
+                    return 0.001  # قيمة افتراضية
+                
+                df = self.feature_engineer.add_technical_indicators(df)
+                return df['atr_14'].iloc[-1]
+            else:
+                # قيمة افتراضية على Linux
+                return 0.001
             
         except Exception as e:
             logger.error(f"Error getting ATR: {e}")

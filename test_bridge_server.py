@@ -7,6 +7,7 @@ import requests
 import json
 from datetime import datetime
 import sys
+import time
 
 def test_server(server_url="http://localhost:5000"):
     """اختبار جميع نقاط النهاية للخادم"""
@@ -29,9 +30,36 @@ def test_server(server_url="http://localhost:5000"):
     
     # 2. اختبار الحصول على إشارة
     print("\n2️⃣ اختبار الحصول على إشارة...")
+    
+    # إرسال عدة أسعار لبناء تاريخ
+    print("   إرسال بيانات أسعار متعددة...")
+    prices = [1.0850, 1.0852, 1.0848, 1.0851, 1.0853, 
+              1.0855, 1.0854, 1.0856, 1.0858, 1.0860,
+              1.0862, 1.0865, 1.0863, 1.0864, 1.0866,
+              1.0868, 1.0870, 1.0869, 1.0871, 1.0872]
+    
+    for i, price in enumerate(prices):
+        signal_data = {
+            "symbol": "EURUSD",
+            "price": price,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        if i == len(prices) - 1:  # آخر سعر فقط
+            break
+        else:
+            # إرسال الأسعار لبناء التاريخ
+            requests.post(
+                f"{server_url}/get_signal",
+                json=signal_data,
+                headers={'Content-Type': 'application/json'}
+            )
+            time.sleep(0.1)  # تأخير صغير
+    
+    # الآن اختبار الإشارة الأخيرة
     signal_data = {
         "symbol": "EURUSD",
-        "price": 1.0850,
+        "price": prices[-1],
         "timestamp": datetime.now().isoformat()
     }
     
