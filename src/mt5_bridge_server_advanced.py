@@ -110,23 +110,25 @@ class AdvancedMLServer:
                     
                     # التنبؤ باستخدام النموذج المناسب
                     model_key = f"{symbol}_{model_timeframe}"
+                    logger.info(f"🔍 Model key: {model_key} (symbol={symbol}, timeframe={model_timeframe})")
                     
+                    logger.info(f"🔍 Searching for model: {model_key}")
                     if model_key not in self.predictor.models:
                         logger.warning(f"No model found for {model_key}")
                         # محاولة بدون suffix
-                        alt_key = f"{symbol.rstrip('m')}_{model_timeframe}"
+                        alt_key = f"{symbol}_{model_timeframe}"
                         if alt_key in self.predictor.models:
                             model_key = alt_key
                         else:
                             return {
                                 'action': 'NO_TRADE',
                                 'confidence': 0,
-                                'reason': f'No model for {symbol} {timeframe}'
+                                'reason': f'No model for {model_key}'
                             }
                     
                     # التنبؤ
                     result = self.predictor.predict_with_confidence(
-                        symbol=symbol.rstrip('m'),
+                        symbol=symbol,
                         timeframe=model_timeframe,
                         current_data=None,
                         historical_data=bars_data
