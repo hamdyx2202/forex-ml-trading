@@ -8,10 +8,10 @@
 #property version   "4.0"
 
 // إعدادات الإدخال
-input string   ServerUrl = "http://localhost:5000";     // عنوان الخادم
+input string   ServerUrl = "http://69.62.121.53:5000";  // عنوان الخادم
 input double   RiskPerTrade = 0.01;                     // المخاطرة لكل صفقة (1%)
 input int      MagicNumber = 123456;                    // الرقم السحري
-input int      BarsToSend = 100;                        // عدد الشموع المرسلة
+input int      BarsToSend = 200;                        // عدد الشموع المرسلة
 input int      UpdateIntervalSeconds = 60;               // فترة التحديث (ثانية)
 input bool     EnableTrading = true;                    // تفعيل التداول
 input bool     ShowDashboard = true;                    // عرض لوحة المعلومات
@@ -425,7 +425,7 @@ string SendToServer(string jsonData)
    StringToCharArray(jsonData, post, 0, StringLen(jsonData));
    
    int timeout = 5000;
-   string url = ServerUrl + "/predict";
+   string url = ServerUrl + "/get_signal";
    
    int res = WebRequest("POST", url, headers, timeout, post, result, resultHeaders);
    
