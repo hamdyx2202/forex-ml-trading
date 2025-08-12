@@ -40,20 +40,27 @@ class AdvancedPredictor:
         for model_file in model_files:
             try:
                 # استخراج اسم الزوج والإطار الزمني
-                filename = model_file.stem
-                parts = filename.split('_')
-                if len(parts) >= 4:
-                    symbol = parts[0]
-                    timeframe = parts[1]
-                    key = f"{symbol}_{timeframe}"
-                    
-                    # تحميل النموذج
-                    model_data = joblib.load(model_file)
-                    self.models[key] = model_data['model']
-                    self.scalers[key] = model_data['scaler']
-                    self.metrics[key] = model_data.get('metrics', {})
-                    
-                    loaded_count += 1
+                filename = model_file.stem  # e.g., EURUSDm_PERIOD_M5_ensemble_20250812_142405
+                
+                # Extract model key by removing the ensemble timestamp part
+                if '_ensemble_' in filename:
+                    key = filename.split('_ensemble_')[0]  # EURUSDm_PERIOD_M5
+                else:
+                    # Fallback: take first 3 parts
+                    parts = filename.split('_')
+                    if len(parts) >= 3:
+                        key = '_'.join(parts[:3])
+                    else:
+                        key = filename
+                
+                # تحميل النموذج
+                model_data = joblib.load(model_file)
+                self.models[key] = model_data['model']
+                self.scalers[key] = model_data['scaler']
+                self.metrics[key] = model_data.get('metrics', {})
+                
+                loaded_count += 1
+                print(f"✅ Loaded model: {key}")
                     
             except Exception as e:
                 print(f"❌ Error loading {model_file}: {e}")
