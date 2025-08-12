@@ -25,7 +25,7 @@ logger.add("logs/advanced_server.log", rotation="1 day", retention="30 days")
 # Import advanced predictor
 sys.path.append(str(Path(__file__).parent.parent))
 from src.advanced_predictor_95 import AdvancedPredictor
-from feature_engineer_fixed_v2 import FeatureEngineer
+from feature_engineer_adaptive import AdaptiveFeatureEngineer as FeatureEngineer
 
 app = Flask(__name__)
 CORS(app)
@@ -34,7 +34,7 @@ class AdvancedMLServer:
     def __init__(self):
         """تهيئة الخادم المتقدم"""
         self.predictor = AdvancedPredictor()
-        self.feature_engineer = FeatureEngineer()
+        self.feature_engineer = FeatureEngineer(target_features=68)
         self.models_loaded = len(self.predictor.models) > 0
         
         logger.info(f"Advanced ML Server initialized")

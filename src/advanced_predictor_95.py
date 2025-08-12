@@ -106,8 +106,10 @@ class AdvancedPredictor:
             # تحضير الميزات
             if historical_data is not None:
                 # استخدام البيانات التاريخية لحساب المؤشرات
-                from feature_engineer_fixed_v2 import FeatureEngineer
-                engineer = FeatureEngineer()
+                import sys
+                sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+                from feature_engineer_adaptive import AdaptiveFeatureEngineer as FeatureEngineer
+                engineer = FeatureEngineer(target_features=68)
                 
                 # تحويل البيانات إلى DataFrame
                 df = pd.DataFrame(historical_data)
