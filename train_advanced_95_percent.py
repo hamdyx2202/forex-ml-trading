@@ -34,7 +34,7 @@ import warnings
 warnings.filterwarnings('ignore')
 
 # Import our feature engineer
-from feature_engineer_fixed import FeatureEngineer
+from feature_engineer_fixed_v2 import FeatureEngineer
 
 class AdvancedModelTrainer:
     """نظام التدريب المتقدم للوصول لدقة عالية جداً"""
