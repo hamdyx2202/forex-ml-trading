@@ -44,9 +44,9 @@ class DataCollector:
     """جمع البيانات - متوافق مع Linux و Windows"""
     
     def __init__(self, config_path: str = "config/config.json"):
+        self.is_linux = platform.system() == 'Linux'
         self.config = self._load_config(config_path)
         self.db_path = self.config["database"]["path"]
-        self.is_linux = platform.system() == 'Linux'
         self._ensure_database()
         logger.add("logs/data_collector.log", rotation="1 day", retention="30 days")
         

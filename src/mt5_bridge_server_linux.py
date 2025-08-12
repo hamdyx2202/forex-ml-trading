@@ -364,6 +364,63 @@ def receive_live_data():
         logger.error(f"Live data error: {e}")
         return jsonify({"error": str(e)}), 500
 
+def save_bar_data(data: dict):
+    """حفظ بيانات شمعة واحدة في قاعدة البيانات"""
+    try:
+        import sqlite3
+        from pathlib import Path
+        
+        Path("data").mkdir(exist_ok=True)
+        
+        conn = sqlite3.connect("data/forex_ml.db")
+        cursor = conn.cursor()
+        
+        # إنشاء الجدول إذا لم يكن موجوداً
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS price_data (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                symbol TEXT NOT NULL,
+                timeframe TEXT NOT NULL,
+                time INTEGER NOT NULL,
+                open REAL NOT NULL,
+                high REAL NOT NULL,
+                low REAL NOT NULL,
+                close REAL NOT NULL,
+                volume INTEGER NOT NULL,
+                spread INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(symbol, timeframe, time)
+            )
+        """)
+        
+        # استخراج الإطار الزمني من الوقت (افتراضي)
+        timeframe = data.get('timeframe', 'M5')
+        
+        # حفظ البيانات
+        cursor.execute("""
+            INSERT OR REPLACE INTO price_data 
+            (symbol, timeframe, time, open, high, low, close, volume, spread)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            data.get('symbol'),
+            timeframe,
+            int(data.get('time')),
+            float(data.get('open')),
+            float(data.get('high')),
+            float(data.get('low')),
+            float(data.get('close')),
+            int(data.get('volume', 0)),
+            int(data.get('spread', 0))
+        ))
+        
+        conn.commit()
+        conn.close()
+        
+        logger.debug(f"Saved bar data for {data.get('symbol')}")
+        
+    except Exception as e:
+        logger.error(f"Error saving bar data: {e}")
+
 def save_historical_data(symbol: str, timeframe: str, bars_data: list) -> int:
     """Save historical data to database"""
     try:
@@ -475,6 +532,10 @@ def get_signal():
         # استخراج البيانات
         symbol = str(data.get('symbol', 'EURUSDm'))
         price = float(data.get('price', 1.1000))
+        
+        # حفظ البيانات إذا كانت تحتوي على معلومات OHLC
+        if all(key in data for key in ['time', 'open', 'high', 'low', 'close']):
+            save_bar_data(data)
         
         logger.info(f"Processing signal for {symbol} at {price}")
         
