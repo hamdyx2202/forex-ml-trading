@@ -25,8 +25,7 @@ logger.add("logs/advanced_server.log", rotation="1 day", retention="30 days")
 # Import advanced predictor
 sys.path.append(str(Path(__file__).parent.parent))
 from src.advanced_predictor_95 import AdvancedPredictor
-sys.path.append(str(Path(__file__).parent.parent))
-from feature_engineer_fixed_v5 import FeatureEngineer
+from feature_engineer_fixed_v2 import FeatureEngineer
 
 app = Flask(__name__)
 CORS(app)
