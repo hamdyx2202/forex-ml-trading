@@ -163,8 +163,10 @@ class AdaptiveFeatureEngineer:
         logger.info(f"Starting adaptive feature engineering for {len(df)} rows")
         
         # Keep essential columns
-        essential_cols = ['open', 'high', 'low', 'close', 'volume', 'time', 'datetime']
-        df_essential = df[essential_cols].copy() if 'volume' in df else df[essential_cols[:-1]].copy()
+        essential_cols = ['open', 'high', 'low', 'close', 'volume', 'time']
+        # Only keep columns that exist
+        available_cols = [col for col in essential_cols if col in df.columns]
+        df_essential = df[available_cols].copy()
         
         # Add features progressively
         df = self.add_technical_indicators(df)
@@ -213,10 +215,10 @@ class AdaptiveFeatureEngineer:
             df = self.add_target_variable(df, **target_config)
         
         # Select features (exclude non-feature columns)
-        feature_cols = [col for col in df.columns 
-                       if col not in ['target', 'target_binary', 'target_3class', 
-                                     'future_return', 'time', 'open', 'high', 
-                                     'low', 'close', 'volume', 'spread', 'datetime']]
+        exclude_cols = ['target', 'target_binary', 'target_3class', 
+                       'future_return', 'time', 'open', 'high', 
+                       'low', 'close', 'volume', 'spread', 'datetime']
+        feature_cols = [col for col in df.columns if col not in exclude_cols]
         
         # Adaptive feature selection
         if self.target_features and len(feature_cols) > self.target_features:
@@ -224,13 +226,15 @@ class AdaptiveFeatureEngineer:
             variances = df[feature_cols].var()
             selected_features = variances.nlargest(self.target_features).index.tolist()
             
-            # Keep only selected features plus essential columns
-            keep_cols = essential_cols + selected_features
+            # Keep only selected features plus essential columns that exist
+            keep_cols = [col for col in essential_cols if col in df.columns] + selected_features
             if 'target' in df.columns:
                 keep_cols.append('target')
             if 'target_binary' in df.columns:
                 keep_cols.append('target_binary')
                 
+            # Only keep columns that actually exist
+            keep_cols = [col for col in keep_cols if col in df.columns]
             df = df[keep_cols]
             logger.info(f"Selected {len(selected_features)} features from {len(feature_cols)} available")
         
@@ -259,6 +263,10 @@ class AdaptiveFeatureEngineer:
         # Remove target columns
         target_cols = ['target', 'target_3class', 'target_binary', 'future_return']
         df_features = df_features.drop(columns=[col for col in target_cols if col in df_features.columns])
+        
+        # Also remove non-feature columns
+        non_feature_cols = ['time', 'open', 'high', 'low', 'close', 'volume', 'spread', 'datetime']
+        df_features = df_features.drop(columns=[col for col in non_feature_cols if col in df_features.columns])
         
         # Match expected features if provided
         if expected_features:
