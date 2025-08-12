@@ -8,7 +8,7 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from src.feature_engineer import FeatureEngineer
+from feature_engineer_fixed import FeatureEngineer
 from src.model_trainer import ModelTrainer
 from loguru import logger
 import pandas as pd

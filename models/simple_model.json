@@ -1,0 +1,11 @@
+{
+  "type": "simple_ma_crossover",
+  "fast_period": 10,
+  "slow_period": 30,
+  "created_at": "2025-08-12T05:24:53.932288",
+  "rules": {
+    "buy": "fast_ma > slow_ma",
+    "sell": "fast_ma < slow_ma",
+    "risk_per_trade": 0.01
+  }
+}
