@@ -1,0 +1,413 @@
+{% extends "base.html" %}
+
+{% block title %}لوحة التحكم - Forex ML Trading{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- System Status -->
+    <div class="col-12 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-cpu"></i> حالة النظام
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-md-4">
+                        <div class="metric-card">
+                            <i class="bi bi-server" style="font-size: 2rem; color: var(--info-color);"></i>
+                            <div class="metric-label">السيرفر الرئيسي</div>
+                            <div class="d-flex justify-content-center align-items-center mt-2">
+                                <span id="server-status" class="status-indicator status-unknown"></span>
+                                <span class="ms-2" id="server-text">جاري الفحص...</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="metric-card">
+                            <i class="bi bi-brain" style="font-size: 2rem; color: var(--warning-color);"></i>
+                            <div class="metric-label">التعلم المتقدم</div>
+                            <div class="d-flex justify-content-center align-items-center mt-2">
+                                <span id="advanced-status" class="status-indicator status-unknown"></span>
+                                <span class="ms-2" id="advanced-text">جاري الفحص...</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="metric-card">
+                            <i class="bi bi-arrow-repeat" style="font-size: 2rem; color: var(--success-color);"></i>
+                            <div class="metric-label">التعلم المستمر</div>
+                            <div class="d-flex justify-content-center align-items-center mt-2">
+                                <span id="continuous-status" class="status-indicator status-unknown"></span>
+                                <span class="ms-2" id="continuous-text">جاري الفحص...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Statistics Row -->
+    <div class="col-md-3 mb-4">
+        <div class="card">
+            <div class="card-body metric-card">
+                <i class="bi bi-cpu-fill" style="font-size: 2rem; color: var(--info-color);"></i>
+                <div class="metric-value" id="cpu-usage">--</div>
+                <div class="metric-label">استخدام المعالج</div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3 mb-4">
+        <div class="card">
+            <div class="card-body metric-card">
+                <i class="bi bi-memory" style="font-size: 2rem; color: var(--warning-color);"></i>
+                <div class="metric-value" id="memory-usage">--</div>
+                <div class="metric-label">استخدام الذاكرة</div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3 mb-4">
+        <div class="card">
+            <div class="card-body metric-card">
+                <i class="bi bi-hdd-fill" style="font-size: 2rem; color: var(--danger-color);"></i>
+                <div class="metric-value" id="disk-usage">--</div>
+                <div class="metric-label">مساحة القرص</div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3 mb-4">
+        <div class="card">
+            <div class="card-body metric-card">
+                <i class="bi bi-clock-fill" style="font-size: 2rem; color: var(--success-color);"></i>
+                <div class="metric-value" id="uptime">--</div>
+                <div class="metric-label">وقت التشغيل</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Trading Statistics -->
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-graph-up"></i> إحصائيات التداول
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-6 text-center">
+                        <div class="metric-value text-info" id="total-trades">--</div>
+                        <div class="metric-label">إجمالي الصفقات</div>
+                    </div>
+                    <div class="col-6 text-center">
+                        <div class="metric-value text-success" id="win-rate">--%</div>
+                        <div class="metric-label">معدل النجاح</div>
+                    </div>
+                </div>
+                <hr>
+                <div class="row">
+                    <div class="col-6 text-center">
+                        <div class="metric-value text-warning" id="models-count">--</div>
+                        <div class="metric-label">عدد النماذج</div>
+                    </div>
+                    <div class="col-6 text-center">
+                        <div class="metric-value text-primary" id="active-pairs">8</div>
+                        <div class="metric-label">الأزواج النشطة</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Recent Signals -->
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="bi bi-activity"></i> آخر الإشارات
+                </h5>
+                <a href="/signals" class="btn btn-sm btn-outline-primary">عرض الكل</a>
+            </div>
+            <div class="card-body" style="max-height: 300px; overflow-y: auto;">
+                <div id="recent-signals">
+                    <div class="text-center text-muted py-4">
+                        <i class="bi bi-hourglass-split"></i> جاري تحميل الإشارات...
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Quick Actions -->
+    <div class="col-12 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-lightning-fill"></i> إجراءات سريعة
+                </h5>
+            </div>
+            <div class="card-body text-center">
+                <button class="btn btn-success btn-control" onclick="restartAll()">
+                    <i class="bi bi-arrow-clockwise"></i> إعادة تشغيل الكل
+                </button>
+                <button class="btn btn-warning btn-control" onclick="backupNow()">
+                    <i class="bi bi-download"></i> نسخ احتياطي الآن
+                </button>
+                <button class="btn btn-info btn-control" onclick="clearOldLogs()">
+                    <i class="bi bi-trash"></i> مسح السجلات القديمة
+                </button>
+                <button class="btn btn-primary btn-control" onclick="testSignal()">
+                    <i class="bi bi-broadcast"></i> اختبار الإشارة
+                </button>
+                <button class="btn btn-danger btn-control" onclick="emergencyStop()">
+                    <i class="bi bi-stop-circle"></i> إيقاف طوارئ
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Performance Chart -->
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-bar-chart-line"></i> أداء النظام (آخر 24 ساعة)
+                </h5>
+            </div>
+            <div class="card-body">
+                <canvas id="performanceChart" height="100"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// تحديث الإحصائيات
+function updateStats() {
+    fetch('/api/stats')
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('cpu-usage').textContent = data.cpu_percent.toFixed(1) + '%';
+            document.getElementById('memory-usage').textContent = data.memory_percent.toFixed(1) + '%';
+            document.getElementById('disk-usage').textContent = data.disk_usage.toFixed(1) + '%';
+            document.getElementById('uptime').textContent = data.uptime;
+            document.getElementById('total-trades').textContent = data.total_trades;
+            document.getElementById('win-rate').textContent = data.win_rate.toFixed(1) + '%';
+            document.getElementById('models-count').textContent = data.models_count;
+            
+            // تحديث ألوان حسب القيم
+            updateColorByValue('cpu-usage', data.cpu_percent, 70, 90);
+            updateColorByValue('memory-usage', data.memory_percent, 70, 90);
+            updateColorByValue('disk-usage', data.disk_usage, 70, 90);
+        });
+}
+
+// تحديث الإشارات الأخيرة
+function updateRecentSignals() {
+    fetch('/api/signals/latest')
+        .then(response => response.json())
+        .then(signals => {
+            const container = document.getElementById('recent-signals');
+            if (signals.length === 0) {
+                container.innerHTML = '<div class="text-center text-muted py-4">لا توجد إشارات حديثة</div>';
+                return;
+            }
+            
+            let html = '';
+            signals.slice(0, 5).forEach(signal => {
+                const signalClass = signal.signal === 'BUY' ? 'signal-buy' : 'signal-sell';
+                const signalIcon = signal.signal === 'BUY' ? 'bi-arrow-up-circle' : 'bi-arrow-down-circle';
+                const signalColor = signal.signal === 'BUY' ? 'text-success' : 'text-danger';
+                
+                html += `
+                    <div class="signal-card ${signalClass} mb-2">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <i class="bi ${signalIcon} ${signalColor}"></i>
+                                <strong>${signal.symbol}</strong> - ${signal.signal}
+                            </div>
+                            <div>
+                                <span class="badge bg-secondary">${(signal.confidence * 100).toFixed(1)}%</span>
+                            </div>
+                        </div>
+                        <small class="text-muted">${new Date(signal.time).toLocaleString('ar-EG')}</small>
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+        });
+}
+
+// تحديث حالة النظام
+socket.on('status_update', function(status) {
+    // تحديث النصوص
+    const statusTexts = {
+        'running': 'يعمل',
+        'stopped': 'متوقف',
+        'error': 'خطأ',
+        'unknown': 'غير معروف'
+    };
+    
+    document.getElementById('server-text').textContent = statusTexts[status.server] || 'غير معروف';
+    document.getElementById('advanced-text').textContent = statusTexts[status.advanced_learner] || 'غير معروف';
+    document.getElementById('continuous-text').textContent = statusTexts[status.continuous_learner] || 'غير معروف';
+});
+
+// وظائف التحكم
+function restartAll() {
+    if (confirm('هل أنت متأكد من إعادة تشغيل جميع الأنظمة؟')) {
+        controlAction('restart_all');
+    }
+}
+
+function emergencyStop() {
+    if (confirm('تحذير: سيتم إيقاف جميع الأنظمة! هل أنت متأكد؟')) {
+        controlAction('emergency_stop');
+    }
+}
+
+function backupNow() {
+    controlAction('backup_now');
+}
+
+function clearOldLogs() {
+    if (confirm('سيتم حذف السجلات القديمة. هل أنت متأكد؟')) {
+        controlAction('clear_logs');
+    }
+}
+
+function testSignal() {
+    // TODO: تنفيذ اختبار الإشارة
+    showAlert('جاري اختبار الإشارة...', 'info');
+}
+
+function controlAction(action) {
+    fetch(`/api/control/${action}`, { method: 'POST' })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showAlert(data.message, 'success');
+            } else {
+                showAlert(data.message, 'danger');
+            }
+            // تحديث الحالة
+            socket.emit('request_update');
+        })
+        .catch(error => {
+            showAlert('حدث خطأ: ' + error, 'danger');
+        });
+}
+
+// تحديث لون حسب القيمة
+function updateColorByValue(elementId, value, warningThreshold, dangerThreshold) {
+    const element = document.getElementById(elementId);
+    element.classList.remove('text-success', 'text-warning', 'text-danger');
+    
+    if (value >= dangerThreshold) {
+        element.classList.add('text-danger');
+    } else if (value >= warningThreshold) {
+        element.classList.add('text-warning');
+    } else {
+        element.classList.add('text-success');
+    }
+}
+
+// رسم بياني للأداء
+let performanceChart;
+
+function initPerformanceChart() {
+    const ctx = document.getElementById('performanceChart').getContext('2d');
+    performanceChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{
+                label: 'CPU %',
+                data: [],
+                borderColor: 'rgb(52, 152, 219)',
+                backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                tension: 0.4
+            }, {
+                label: 'Memory %',
+                data: [],
+                borderColor: 'rgb(243, 156, 18)',
+                backgroundColor: 'rgba(243, 156, 18, 0.1)',
+                tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'top',
+                    labels: {
+                        color: '#ecf0f1'
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    ticks: { color: '#95a5a6' },
+                    grid: { color: 'rgba(255, 255, 255, 0.1)' }
+                },
+                y: {
+                    ticks: { color: '#95a5a6' },
+                    grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                    beginAtZero: true,
+                    max: 100
+                }
+            }
+        }
+    });
+}
+
+// تحديث الرسم البياني
+function updatePerformanceChart(cpuData, memoryData) {
+    const now = new Date().toLocaleTimeString('ar-EG');
+    
+    // إضافة البيانات الجديدة
+    performanceChart.data.labels.push(now);
+    performanceChart.data.datasets[0].data.push(cpuData);
+    performanceChart.data.datasets[1].data.push(memoryData);
+    
+    // الاحتفاظ بآخر 20 نقطة فقط
+    if (performanceChart.data.labels.length > 20) {
+        performanceChart.data.labels.shift();
+        performanceChart.data.datasets[0].data.shift();
+        performanceChart.data.datasets[1].data.shift();
+    }
+    
+    performanceChart.update();
+}
+
+// تحديث دوري
+setInterval(() => {
+    updateStats();
+    updateRecentSignals();
+}, 5000);
+
+// تحديث الرسم البياني كل 10 ثواني
+setInterval(() => {
+    fetch('/api/stats')
+        .then(response => response.json())
+        .then(data => {
+            updatePerformanceChart(data.cpu_percent, data.memory_percent);
+        });
+}, 10000);
+
+// البدء
+document.addEventListener('DOMContentLoaded', function() {
+    updateStats();
+    updateRecentSignals();
+    initPerformanceChart();
+});
+</script>
+{% endblock %}

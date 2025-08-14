@@ -1,0 +1,26 @@
+[Unit]
+Description=Forex ML Trading Server
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/home/forex-ml-trading
+Environment="PATH=/home/forex-ml-trading/venv_pro/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+ExecStartPre=/bin/sleep 10
+ExecStart=/home/forex-ml-trading/venv_pro/bin/python /home/forex-ml-trading/src/mt5_bridge_server_advanced.py
+Restart=always
+RestartSec=30
+StandardOutput=append:/home/forex-ml-trading/logs/server.log
+StandardError=append:/home/forex-ml-trading/logs/server_error.log
+
+# حماية من إعادة التشغيل المفرطة
+StartLimitInterval=600
+StartLimitBurst=5
+
+# إعدادات الأمان
+PrivateTmp=true
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

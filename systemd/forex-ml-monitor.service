@@ -1,0 +1,17 @@
+[Unit]
+Description=Forex ML Auto Restart Monitor
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/home/forex-ml-trading
+Environment="PATH=/home/forex-ml-trading/venv_pro/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+ExecStart=/home/forex-ml-trading/venv_pro/bin/python /home/forex-ml-trading/web_dashboard/auto_restart.py
+Restart=always
+RestartSec=60
+StandardOutput=append:/home/forex-ml-trading/logs/monitor.log
+StandardError=append:/home/forex-ml-trading/logs/monitor_error.log
+
+[Install]
+WantedBy=multi-user.target
