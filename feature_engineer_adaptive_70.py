@@ -173,6 +173,7 @@ class AdaptiveFeatureEngineer:
         df = self.add_price_features(df)
         df = self.add_time_features(df)
         df = self.add_market_structure(df)
+        df = self.add_extended_features(df)
         
         # Only add patterns if we need more features
         current_features = [col for col in df.columns if col not in essential_cols]
@@ -221,7 +222,7 @@ class AdaptiveFeatureEngineer:
         feature_cols = [col for col in df.columns if col not in exclude_cols]
         
         # Adaptive feature selection
-        if self.target_features and len(feature_cols) != self.target_features:
+        if self.target_features and len(feature_cols) > self.target_features:
             # Select most important features based on variance
             variances = df[feature_cols].var()
             selected_features = variances.nlargest(self.target_features).index.tolist()
@@ -239,20 +240,6 @@ class AdaptiveFeatureEngineer:
             logger.info(f"Selected {len(selected_features)} features from {len(feature_cols)} available")
         
         logger.info(f"Feature engineering completed. Features: {len(feature_cols)}")
-        
-        # التأكد من 70 ميزة للنماذج الحالية
-        final_feature_cols = [col for col in df.columns 
-                             if col not in ['target', 'target_binary', 'target_3class', 
-                                           'future_return', 'time', 'open', 'high', 
-                                           'low', 'close', 'volume', 'spread', 'datetime']]
-        
-        if len(final_feature_cols) < 70:
-            logger.info(f"Adding padding features: {len(final_feature_cols)} -> 70")
-            for i in range(len(final_feature_cols), 70):
-                df[f'padding_{i}'] = 0.0
-        
-        logger.info(f"Final feature count: {len([c for c in df.columns if c not in ['target', 'target_binary', 'target_3class', 'future_return', 'time', 'open', 'high', 'low', 'close', 'volume', 'spread', 'datetime']])}")
-
         
         return df
     
