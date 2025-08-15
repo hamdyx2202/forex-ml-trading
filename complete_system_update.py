@@ -372,9 +372,9 @@ if __name__ == "__main__":
     print("and add configuration for all trading instruments.")
     print("\nA backup will be created before making changes.")
     
-    response = input("\nProceed with update? (yes/no): ")
+    response = input("\nProceed with update? (yes/y/no/n): ")
     
-    if response.lower() == 'yes':
+    if response.lower() in ['yes', 'y']:
         updater.run_update()
     else:
         print("Update cancelled.")
