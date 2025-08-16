@@ -31,7 +31,7 @@ case "$1" in
         ps aux | grep -E "python.*(mt5|learner|training)" | grep -v grep
         
         print_section "2. فحص المنافذ"
-        netstat -tulpn | grep :5000
+        ss -tulpn | grep :5000 2>/dev/null || echo "المنفذ 5000 غير مستخدم"
         
         print_section "3. فحص استخدام الموارد"
         echo "CPU والذاكرة:"
@@ -71,7 +71,7 @@ case "$1" in
         fi
         
         # فحص المنفذ
-        if netstat -tulpn 2>/dev/null | grep -q ":5000"; then
+        if ss -tulpn 2>/dev/null | grep -q ":5000"; then
             print_colored "✅ المنفذ 5000 مفتوح" "$GREEN"
         else
             print_colored "❌ المنفذ 5000 مغلق" "$RED"
@@ -158,7 +158,7 @@ case "$1" in
         # الاتصالات النشطة
         echo ""
         echo "الاتصالات النشطة على المنفذ 5000:"
-        netstat -an | grep :5000
+        ss -an | grep :5000
         
         # جدار الحماية
         echo ""
@@ -218,7 +218,7 @@ case "$1" in
             
             echo ""
             echo "المنفذ 5000:"
-            netstat -an | grep :5000 | grep ESTABLISHED | wc -l | xargs echo "اتصالات نشطة:"
+            ss -an | grep :5000 | grep ESTABLISHED | wc -l | xargs echo "اتصالات نشطة:"
             
             echo ""
             echo "آخر السجلات:"
@@ -251,6 +251,46 @@ case "$1" in
              -w "\nHTTP Code: %{http_code}\nTime: %{time_total}s\n" 2>/dev/null
         ;;
         
+    # ============== أوامر بدء السيرفر ==============
+    "start-server")
+        print_section "بدء سيرفر MT5"
+        
+        # فحص البيئة الافتراضية
+        if [ -d "venv_pro" ]; then
+            print_colored "✅ تم العثور على البيئة الافتراضية venv_pro" "$GREEN"
+            source venv_pro/bin/activate
+        elif [ -d "venv" ]; then
+            print_colored "✅ تم العثور على البيئة الافتراضية venv" "$GREEN"
+            source venv/bin/activate
+        else
+            print_colored "⚠️ لا توجد بيئة افتراضية - استخدام Python النظام" "$YELLOW"
+        fi
+        
+        # التحقق من وجود ملف السيرفر
+        if [ -f "start_bridge_server.py" ]; then
+            print_colored "🚀 بدء السيرفر..." "$GREEN"
+            python start_bridge_server.py
+        elif [ -f "src/mt5_bridge_server_linux.py" ]; then
+            print_colored "🚀 بدء السيرفر مباشرة..." "$GREEN"
+            python -m src.mt5_bridge_server_linux
+        else
+            print_colored "❌ لم يتم العثور على ملف السيرفر" "$RED"
+        fi
+        ;;
+        
+    "stop-server")
+        print_section "إيقاف سيرفر MT5"
+        
+        # إيقاف العملية
+        if pgrep -f "mt5_bridge_server" > /dev/null; then
+            PID=$(pgrep -f "mt5_bridge_server")
+            kill $PID
+            print_colored "✅ تم إيقاف السيرفر (PID: $PID)" "$GREEN"
+        else
+            print_colored "❌ السيرفر غير مشغل" "$RED"
+        fi
+        ;;
+        
     # ============== مساعدة ==============
     *)
         print_colored "📌 أوامر التشخيص المتاحة:" "$PURPLE"
@@ -271,6 +311,10 @@ case "$1" in
         print_colored "📊 أوامر المراقبة:" "$YELLOW"
         echo "  ./server_diagnostics.sh monitor         - مراقبة مباشرة"
         echo "  ./server_diagnostics.sh test-connection - اختبار الاتصال"
+        echo ""
+        print_colored "🚀 أوامر التحكم:" "$YELLOW"
+        echo "  ./server_diagnostics.sh start-server    - بدء السيرفر"
+        echo "  ./server_diagnostics.sh stop-server     - إيقاف السيرفر"
         echo ""
         ;;
 esac
