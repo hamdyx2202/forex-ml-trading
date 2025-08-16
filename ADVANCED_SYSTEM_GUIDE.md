@@ -60,6 +60,16 @@ python RUN_ADVANCED_SYSTEM.py
 # تدريب جميع الأزواج بالنظام المتقدم
 python train_advanced_complete.py
 
+ 📊 كيفية الاستخدام:
+
+  # تدريب شامل بالمعالجة المتوازية (افتراضي)
+  python train_advanced_complete_parallel.py
+
+  # تحديد عدد العمليات المتوازية
+  python train_advanced_complete_parallel.py --workers 4
+
+  # اختبار سريع لعملة واحدة
+  python train_advanced_complete_parallel.py --quick
 # أو لتدريب زوج واحد
 python train_advanced_complete.py --symbol EURUSD --timeframe H1
 ```
