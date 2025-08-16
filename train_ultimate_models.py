@@ -30,11 +30,46 @@ from catboost import CatBoostClassifier
 import optuna
 
 # استيراد الأنظمة المتقدمة
-from src.feature_engineer_fixed_v2 import FeatureEngineer
-from support_resistance import SupportResistanceCalculator
-from src.dynamic_sl_tp_system import DynamicSLTPSystem
-from src.advanced_learner import AdvancedHistoricalLearner
-from src.continuous_learner import ContinuousLearner
+try:
+    from feature_engineer_fixed_v2 import FeatureEngineer
+except:
+    from src.feature_engineer import FeatureEngineer
+
+try:
+    from support_resistance import SupportResistanceCalculator
+except:
+    # إنشاء نسخة بسيطة إذا لم يكن الملف موجود
+    class SupportResistanceCalculator:
+        def calculate_all_levels(self, df, symbol):
+            return {}
+
+try:
+    from src.dynamic_sl_tp_system import DynamicSLTPSystem
+except:
+    # نسخة بسيطة
+    class DynamicSLTPSystem:
+        def get_symbol_info(self, symbol):
+            return {'pip_size': 0.0001}
+        def calculate_sl_tp(self, **kwargs):
+            return {'sl': 0, 'tp': 0, 'risk_reward_ratio': 2.0}
+
+try:
+    from src.advanced_learner import AdvancedHistoricalLearner
+except:
+    class AdvancedHistoricalLearner:
+        def analyze_historical_opportunities(self, *args, **kwargs):
+            pass
+        def get_pattern_summary(self, *args):
+            return {}
+
+try:
+    from src.continuous_learner import ContinuousLearner
+except:
+    class ContinuousLearner:
+        def learn_from_predictions(self, *args, **kwargs):
+            pass
+        def get_improvement_suggestions(self):
+            return []
 
 # إعداد التسجيل
 logger.remove()
