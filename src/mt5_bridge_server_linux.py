@@ -14,6 +14,7 @@ import numpy as np
 import os
 import sys
 from typing import Dict, List, Optional
+import time
 
 # تكوين Flask لقبول أي content-type
 class FlexibleRequest(Flask):
@@ -28,6 +29,31 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
 app.config['JSON_AS_ASCII'] = False
+
+def convert_mt5_time(mt5_time):
+    """Convert MT5 time format to Unix timestamp"""
+    if isinstance(mt5_time, (int, float)):
+        # Already a timestamp
+        return int(mt5_time)
+    
+    if isinstance(mt5_time, str):
+        try:
+            # Try parsing MT5 format: "2025.08.15 12:00"
+            dt = datetime.strptime(mt5_time, "%Y.%m.%d %H:%M")
+            return int(dt.timestamp())
+        except:
+            try:
+                # Try alternative format: "2025.08.15 12:00:00"
+                dt = datetime.strptime(mt5_time, "%Y.%m.%d %H:%M:%S")
+                return int(dt.timestamp())
+            except:
+                # Return current time as fallback
+                logger.warning(f"Could not parse time: {mt5_time}")
+                return int(time.time())
+    
+    # Default to current time
+    return int(time.time())
+
 app.config['JSONIFY_MIMETYPE'] = 'application/json'
 
 class SimpleBridgeServer:
@@ -285,6 +311,38 @@ def echo():
             "status": "raw_data"
         })
 
+@app.route('/api/debug/historical', methods=['POST'])
+def debug_historical():
+    """Debug endpoint to see exactly what MT5 is sending"""
+    try:
+        # Get all possible data formats
+        raw_data = request.get_data(as_text=True)
+        content_type = request.content_type
+        headers = dict(request.headers)
+        
+        # Try to parse JSON
+        json_data = None
+        try:
+            json_data = request.get_json(force=True)
+        except:
+            pass
+        
+        response = {
+            "raw_data": raw_data[:1000],  # First 1000 chars
+            "content_type": content_type,
+            "headers": headers,
+            "json_parsed": json_data,
+            "json_keys": list(json_data.keys()) if json_data else None,
+            "sample_bar": json_data.get('data', [{}])[0] if json_data and json_data.get('data') else None
+        }
+        
+        logger.info(f"Debug historical data: {response}")
+        
+        return jsonify(response)
+        
+    except Exception as e:
+        return jsonify({"error": str(e), "type": type(e).__name__}), 500
+
 @app.route('/api/test', methods=['POST'])
 def api_test():
     """API test endpoint for EA connection testing"""
@@ -307,14 +365,36 @@ def api_test():
 def receive_historical_data():
     """Receive historical data from EA"""
     try:
+        # Log raw data for debugging
+        raw_data = request.get_data(as_text=True)
+        logger.info(f"Raw historical data received: {raw_data[:200]}...")
+        
         data = request.get_json(force=True)
+        logger.info(f"Parsed data keys: {list(data.keys()) if data else 'None'}")
         
-        symbol = data.get('symbol')
-        timeframe = data.get('timeframe')
-        bars_data = data.get('data', [])
+        # More flexible field checking
+        symbol = data.get('symbol') or data.get('Symbol')
+        timeframe = data.get('timeframe') or data.get('Timeframe') or data.get('TimeFrame')
+        bars_data = data.get('data') or data.get('Data') or data.get('bars') or data.get('Bars') or []
         
-        if not symbol or not timeframe or not bars_data:
-            return jsonify({"error": "Missing required fields"}), 400
+        # Log what we found
+        logger.info(f"Symbol: {symbol}, Timeframe: {timeframe}, Bars count: {len(bars_data)}")
+        
+        if not symbol:
+            logger.error("Missing symbol field")
+            return jsonify({"error": "Missing symbol field", "received_data": data}), 400
+            
+        if not timeframe:
+            logger.error("Missing timeframe field")
+            return jsonify({"error": "Missing timeframe field", "received_data": data}), 400
+            
+        if not bars_data:
+            logger.error("Missing or empty data/bars field")
+            return jsonify({"error": "Missing or empty data field", "received_data": data}), 400
+        
+        # Log sample bar data
+        if bars_data:
+            logger.info(f"Sample bar data: {bars_data[0] if bars_data else 'Empty'}")
         
         # Save to database
         saved_count = save_historical_data(symbol, timeframe, bars_data)
@@ -330,8 +410,8 @@ def receive_historical_data():
         })
         
     except Exception as e:
-        logger.error(f"Historical data error: {e}")
-        return jsonify({"error": str(e)}), 500
+        logger.error(f"Historical data error: {e}", exc_info=True)
+        return jsonify({"error": str(e), "type": type(e).__name__}), 500
 
 @app.route('/api/live_data', methods=['POST'])
 def receive_live_data():
@@ -453,6 +533,20 @@ def save_historical_data(symbol: str, timeframe: str, bars_data: list) -> int:
         saved_count = 0
         for bar in bars_data:
             try:
+                # Handle different field name variations
+                bar_time = bar.get('time') or bar.get('Time') or bar.get('datetime') or bar.get('DateTime')
+                bar_open = bar.get('open') or bar.get('Open')
+                bar_high = bar.get('high') or bar.get('High')
+                bar_low = bar.get('low') or bar.get('Low')
+                bar_close = bar.get('close') or bar.get('Close')
+                bar_volume = bar.get('volume') or bar.get('Volume') or bar.get('tick_volume') or 0
+                bar_spread = bar.get('spread') or bar.get('Spread') or 0
+                
+                # Validate required fields
+                if not all([bar_time, bar_open, bar_high, bar_low, bar_close]):
+                    logger.warning(f"Skipping bar with missing fields: {bar}")
+                    continue
+                
                 cursor.execute("""
                     INSERT OR REPLACE INTO price_data 
                     (symbol, timeframe, time, open, high, low, close, volume, spread)
@@ -460,17 +554,17 @@ def save_historical_data(symbol: str, timeframe: str, bars_data: list) -> int:
                 """, (
                     symbol,
                     timeframe,
-                    int(bar['time']),
-                    float(bar['open']),
-                    float(bar['high']),
-                    float(bar['low']),
-                    float(bar['close']),
-                    int(bar['volume']),
-                    int(bar.get('spread', 0))
+                    convert_mt5_time(bar_time),
+                    float(bar_open),
+                    float(bar_high),
+                    float(bar_low),
+                    float(bar_close),
+                    int(bar_volume),
+                    int(bar_spread)
                 ))
                 saved_count += 1
             except Exception as e:
-                logger.debug(f"Skip bar: {e}")
+                logger.debug(f"Skip bar: {e} - Bar data: {bar}")
         
         conn.commit()
         conn.close()
