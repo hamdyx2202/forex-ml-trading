@@ -25,8 +25,8 @@ class IntegratedTradingSystem:
         # إعدادات التداول
         self.trading_config = {
             'pairs': [
-                'EURUSD', 'GBPUSD', 'USDJPY', 'AUDUSD', 'USDCAD',
-                'XAUUSD', 'XAGUSD', 'BTCUSD', 'US30', 'OIL'
+                'EURUSDm', 'GBPUSDm', 'USDJPYm', 'AUDUSDm', 'USDCADm',
+                'XAUUSDm', 'XAGUSDm', 'BTCUSDm', 'US30m', 'OILm'
             ],
             'timeframes': ['M1', 'M5', 'M15', 'M30', 'H1', 'H4'],
             'risk_per_trade': 0.01,  # 1% من الرصيد

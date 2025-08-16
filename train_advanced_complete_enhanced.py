@@ -166,7 +166,7 @@ class AdvancedCompleteTrainer:
         
     def check_database(self):
         """التحقق من وجود قاعدة البيانات والبيانات"""
-        db_path = Path("data/forex_data.db")
+        db_path = Path("data/forex_ml.db")
         
         if not db_path.exists():
             logger.error("❌ قاعدة البيانات غير موجودة!")
@@ -195,7 +195,7 @@ class AdvancedCompleteTrainer:
     def load_data_advanced(self, symbol, timeframe, limit=100000):
         """تحميل البيانات مع معالجة متقدمة"""
         try:
-            conn = sqlite3.connect("data/forex_data.db")
+            conn = sqlite3.connect("data/forex_ml.db")
             query = """
                 SELECT * FROM price_data 
                 WHERE symbol = ? AND timeframe = ?
@@ -1063,7 +1063,7 @@ class AdvancedCompleteTrainer:
         
         # الحصول على العملات المتاحة
         try:
-            conn = sqlite3.connect("data/forex_data.db")
+            conn = sqlite3.connect("data/forex_ml.db")
             query = """
                 SELECT symbol, timeframe, COUNT(*) as count
                 FROM price_data

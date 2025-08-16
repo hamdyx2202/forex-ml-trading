@@ -31,7 +31,7 @@ def get_best_symbol():
         pass
     
     # قيمة افتراضية
-    return "EURUSD", "M5"
+    return "EURUSDm", "M5"
 
 def quick_test():
     """اختبار سريع"""

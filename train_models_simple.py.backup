@@ -38,7 +38,7 @@ class SimpleModelTrainer:
     def get_all_symbols_from_db(self):
         """الحصول على جميع العملات من قاعدة البيانات"""
         try:
-            conn = sqlite3.connect("data/forex_ml.db")
+            conn = sqlite3.connect("data/forex_data.db")
             query = """
                 SELECT DISTINCT symbol, timeframe, COUNT(*) as count
                 FROM price_data
@@ -59,7 +59,7 @@ class SimpleModelTrainer:
     def load_data(self, symbol, timeframe, limit=50000):
         """تحميل البيانات من قاعدة البيانات"""
         try:
-            conn = sqlite3.connect("data/forex_ml.db")
+            conn = sqlite3.connect("data/forex_data.db")
             query = """
                 SELECT * FROM price_data 
                 WHERE symbol = ? AND timeframe = ?

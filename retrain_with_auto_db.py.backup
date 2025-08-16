@@ -44,14 +44,14 @@ class AutoDBModelTrainer:
         
         # البحث في المسارات المحتملة
         possible_paths = [
-            'forex_ml.db',
-            'data/forex_ml.db',
-            '../forex_ml.db',
+            'forex_data.db',
+            'data/forex_data.db',
+            '../forex_data.db',
             'forex_ml_data.db',
             'mt5_data.db',
             'trading_data.db',
-            '../../forex_ml.db',
-            '../data/forex_ml.db'
+            '../../forex_data.db',
+            '../data/forex_data.db'
         ]
         
         for path in possible_paths:

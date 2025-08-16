@@ -13,7 +13,7 @@ def main():
     
     # 1. التحقق من قاعدة البيانات
     print("\n1️⃣ فحص قاعدة البيانات...")
-    if not Path("data/forex_ml.db").exists():
+    if not Path("data/forex_data.db").exists():
         print("❌ قاعدة البيانات غير موجودة!")
         print("⏳ جاري إنشاء قاعدة البيانات...")
         os.system("python setup_database.py")
@@ -24,7 +24,7 @@ def main():
     print("\n2️⃣ فحص البيانات...")
     import sqlite3
     try:
-        conn = sqlite3.connect("data/forex_ml.db")
+        conn = sqlite3.connect("data/forex_data.db")
         cursor = conn.cursor()
         cursor.execute("SELECT COUNT(*) FROM price_data")
         count = cursor.fetchone()[0]

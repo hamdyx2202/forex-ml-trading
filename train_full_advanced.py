@@ -49,7 +49,7 @@ class FullAdvancedTrainer:
             }
             
             for _, row in df.iterrows():
-                symbol = row['symbol'].replace('m', '')  # إزالة suffix
+                symbol = row['symbol']  # استخدام الاسم كما هو
                 
                 # تصنيف العملات
                 if any(major in symbol for major in ['EUR', 'GBP', 'USD', 'JPY', 'CHF', 'CAD', 'AUD', 'NZD']):

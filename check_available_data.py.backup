@@ -12,8 +12,8 @@ def check_data():
     # تحديد قاعدة البيانات الصحيحة
     db_paths = [
         "data/forex_ml.db",
-        "data/forex_ml.db",
-        "forex_ml.db"
+        "data/forex_data.db",
+        "forex_data.db"
     ]
     
     db_path = None

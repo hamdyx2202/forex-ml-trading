@@ -37,7 +37,7 @@ class UnifiedAdvancedLearner:
     def __init__(self):
         self.feature_engineer = AdaptiveFeatureEngineer(target_features=STANDARD_FEATURES)
         self.trainer = ModelTrainer()
-        self.db_path = "data/forex_ml.db"
+        self.db_path = "data/forex_data.db"
         self.models_dir = Path(SAVING_STANDARDS['models_dir'])
         self.models_dir.mkdir(parents=True, exist_ok=True)
         

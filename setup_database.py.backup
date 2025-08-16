@@ -18,7 +18,7 @@ def create_database():
     data_dir.mkdir(exist_ok=True)
     
     # الاتصال بقاعدة البيانات
-    db_path = data_dir / "forex_ml.db"
+    db_path = data_dir / "forex_data.db"
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     
@@ -154,7 +154,7 @@ def create_database():
 
 def check_database():
     """التحقق من وجود قاعدة البيانات والبيانات"""
-    db_path = Path("data/forex_ml.db")
+    db_path = Path("data/forex_data.db")
     
     if not db_path.exists():
         print("❌ قاعدة البيانات غير موجودة")

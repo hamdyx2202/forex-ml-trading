@@ -34,7 +34,7 @@ class UnifiedModelTrainer:
         self.scalers = {}
         self.feature_info = {}
         
-    def load_data(self, symbol: str, timeframe: str, db_path: str = 'forex_ml.db'):
+    def load_data(self, symbol: str, timeframe: str, db_path: str = 'forex_data.db'):
         """تحميل البيانات من قاعدة البيانات"""
         import sqlite3
         

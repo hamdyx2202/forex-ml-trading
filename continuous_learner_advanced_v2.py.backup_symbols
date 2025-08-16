@@ -739,7 +739,7 @@ def main():
     learner = AdvancedContinuousLearnerV2()
     
     # الأزواج والفترات الزمنية
-    pairs = ['EURUSD', 'GBPUSD', 'XAUUSD']
+    pairs = ['EURUSDm', 'GBPUSDm', 'XAUUSDm']
     timeframes = ['M5', 'M15', 'H1']
     
     # بدء التعلم المستمر

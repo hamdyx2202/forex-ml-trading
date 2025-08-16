@@ -95,15 +95,15 @@ def transfer_price_data(source_db, target_db):
         return False
 
 def quick_transfer():
-    """نقل سريع من forex_ml.db إلى forex_ml.db"""
+    """نقل سريع من forex_ml.db إلى forex_data.db"""
     source = Path("data/forex_ml.db")
-    target = Path("data/forex_ml.db")
+    target = Path("data/forex_data.db")
     
     if not source.exists():
         print(f"❌ قاعدة البيانات المصدر غير موجودة: {source}")
         return False
     
-    print("🚀 نقل البيانات من forex_ml.db إلى forex_ml.db")
+    print("🚀 نقل البيانات من forex_ml.db إلى forex_data.db")
     print("="*60)
     
     # نقل البيانات

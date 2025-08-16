@@ -148,7 +148,7 @@ class UltimateModelTrainer:
     def get_all_symbols_from_db(self):
         """الحصول على جميع العملات من قاعدة البيانات"""
         try:
-            conn = sqlite3.connect("data/forex_ml.db")
+            conn = sqlite3.connect("data/forex_data.db")
             query = """
                 SELECT DISTINCT symbol, timeframe, COUNT(*) as count
                 FROM price_data
@@ -169,7 +169,7 @@ class UltimateModelTrainer:
     def load_data_with_sr_levels(self, symbol, timeframe, limit=100000):
         """تحميل البيانات مع مستويات الدعم والمقاومة"""
         try:
-            conn = sqlite3.connect("data/forex_ml.db")
+            conn = sqlite3.connect("data/forex_data.db")
             query = """
                 SELECT * FROM price_data 
                 WHERE symbol = ? AND timeframe = ?

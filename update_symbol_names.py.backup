@@ -10,7 +10,7 @@ def update_symbols():
     """تحديث أسماء العملات لإزالة suffix غير مرغوب"""
     
     # البحث عن قاعدة البيانات
-    db_paths = ["data/forex_ml.db", "data/forex_ml.db"]
+    db_paths = ["data/forex_ml.db", "data/forex_data.db"]
     db_path = None
     
     for path in db_paths:

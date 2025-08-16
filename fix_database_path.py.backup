@@ -24,10 +24,10 @@ def fix_database_paths():
             original_content = content
             
             # تحديث المسارات
-            content = content.replace('"data/forex_ml.db"', '"data/forex_ml.db"')
-            content = content.replace("'data/forex_ml.db'", "'data/forex_ml.db'")
-            content = content.replace('Path("data/forex_ml.db")', 'Path("data/forex_ml.db")')
-            content = content.replace("data/forex_ml.db", "data/forex_ml.db")
+            content = content.replace('"data/forex_data.db"', '"data/forex_ml.db"')
+            content = content.replace("'data/forex_data.db'", "'data/forex_ml.db'")
+            content = content.replace('Path("data/forex_data.db")', 'Path("data/forex_ml.db")')
+            content = content.replace("data/forex_data.db", "data/forex_ml.db")
             
             # حفظ الملف إذا تم التعديل
             if content != original_content:

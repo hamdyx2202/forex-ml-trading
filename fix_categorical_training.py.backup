@@ -242,7 +242,7 @@ print("🚀 Starting simplified training...")
 
 # البحث عن قاعدة البيانات
 db_path = None
-for path in ['forex_ml.db', 'data/forex_ml.db', '../forex_ml.db']:
+for path in ['forex_data.db', 'data/forex_data.db', '../forex_data.db']:
     if os.path.exists(path):
         db_path = path
         break

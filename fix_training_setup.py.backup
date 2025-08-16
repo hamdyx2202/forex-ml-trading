@@ -20,9 +20,9 @@ print("\n2️⃣ Searching for database...")
 
 # أماكن محتملة لقاعدة البيانات
 possible_db_paths = [
-    'forex_ml.db',
-    'data/forex_ml.db',
-    '../forex_ml.db',
+    'forex_data.db',
+    'data/forex_data.db',
+    '../forex_data.db',
     'forex_ml_data.db',
     'data/forex_ml_data.db',
     'mt5_data.db',
@@ -127,7 +127,7 @@ if db_path:
     
     if forex_table:
         # تحديث ملف التدريب
-        content = content.replace("db_path: str = 'forex_ml.db'", f"db_path: str = '{db_path}'")
+        content = content.replace("db_path: str = 'forex_data.db'", f"db_path: str = '{db_path}'")
         content = content.replace("FROM forex_data", f"FROM {forex_table}")
         
         # حفظ النسخة المحدثة
@@ -209,7 +209,7 @@ else:
     with open('retrain_with_unified_features.py', 'r') as f:
         content = f.read()
     
-    content = content.replace("db_path: str = 'forex_ml.db'", "db_path: str = 'forex_test_data.db'")
+    content = content.replace("db_path: str = 'forex_data.db'", "db_path: str = 'forex_test_data.db'")
     
     with open('retrain_with_unified_features_fixed.py', 'w') as f:
         f.write(content)
