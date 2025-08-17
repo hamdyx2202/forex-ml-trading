@@ -55,6 +55,28 @@ python RUN_ADVANCED_SYSTEM.py
 
 ### الطريقة اليدوية (للمتقدمين):
 
+
+
+📌 للبدء:
+screen -S parallel8
+cd /home/forex-ml-trading
+source venv_pro/bin/activate
+pkill -f train_advanced_complete_parallel
+pkill -f python
+python train_advanced_complete_parallel.py --workers 8
+للخروج: Ctrl+A ثم D
+
+📌 أوامر إدارة Screen:
+screen -r parallel8
+screen -ls
+screen -d -r parallel8
+screen -X -S parallel8 quit
+
+📌 للمراقبة (في terminal آخر):
+bashwatch -n 2 'ps aux | grep python | grep train | head -10'
+htop
+watch -n 5 'find models/ -name "*.pkl" | wc -l'
+tail -f logs/training_*.log
 #### أ. التدريب الكامل (مرة واحدة):
 ```bash
 # تدريب جميع الأزواج بالنظام المتقدم
@@ -66,7 +88,7 @@ python train_advanced_complete.py
   python train_advanced_complete_parallel.py
 
   # تحديد عدد العمليات المتوازية
-  python train_advanced_complete_parallel.py --workers 4
+  python train_advanced_complete_parallel.py --workers 8
 
   # اختبار سريع لعملة واحدة
   python train_advanced_complete_parallel.py --quick
