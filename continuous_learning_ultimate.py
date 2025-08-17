@@ -13,11 +13,11 @@ import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta
 import asyncio
-import aiohttp
 import logging
 from typing import Dict, List, Tuple, Optional, Any, Union
 from dataclasses import dataclass, field
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
+from pathlib import Path
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -29,36 +29,41 @@ from sklearn.ensemble import (RandomForestClassifier, GradientBoostingClassifier
 from sklearn.neural_network import MLPClassifier
 from sklearn.svm import SVC
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
-import xgboost as xgb
-import lightgbm as lgb
-from catboost import CatBoostClassifier
 
-# Deep Learning
-import tensorflow as tf
-from tensorflow.keras.models import Sequential, Model
-from tensorflow.keras.layers import (Dense, LSTM, GRU, Dropout, BatchNormalization,
-                                   Attention, MultiHeadAttention, Conv1D, MaxPooling1D)
-from tensorflow.keras.optimizers import Adam, AdamW
-from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau, ModelCheckpoint
+# Optional advanced libraries - wrapped in try/except
+try:
+    import xgboost as xgb
+except ImportError:
+    xgb = None
+    
+try:
+    import lightgbm as lgb
+except ImportError:
+    lgb = None
+    
+try:
+    from catboost import CatBoostClassifier
+except ImportError:
+    CatBoostClassifier = None
 
-# Advanced Features
-from sklearn.decomposition import PCA
-from sklearn.feature_selection import SelectKBest, f_classif, mutual_info_classif
-import shap
-import optuna
-import logging
-import numpy as np
-import pandas as pd
-from datetime import datetime, timedelta
-import joblib
-from pathlib import Path
-from typing import Dict, List, Tuple, Any, Optional
-import tensorflow as tf
-import asyncio
-import aiofiles
-from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
-import warnings
-warnings.filterwarnings('ignore')
+# Optional deep learning
+try:
+    import tensorflow as tf
+    from tensorflow.keras.models import Sequential, Model
+    from tensorflow.keras.layers import (Dense, LSTM, GRU, Dropout, BatchNormalization,
+                                       Conv1D, MaxPooling1D)
+    from tensorflow.keras.optimizers import Adam
+    from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau, ModelCheckpoint
+except ImportError:
+    tf = None
+
+# Optional advanced features
+try:
+    from sklearn.decomposition import PCA
+    from sklearn.feature_selection import SelectKBest, f_classif, mutual_info_classif
+except ImportError:
+    PCA = None
+    SelectKBest = None
 
 # إضافة المسار للوصول للملفات
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -1275,8 +1280,8 @@ class ContinuousLearningSystem:
             save_data['state'] = self._prepare_for_json(save_data['state'])
             
             # حفظ البيانات
-            async with aiofiles.open(state_file, 'w') as f:
-                await f.write(json.dumps(save_data, indent=2))
+            with open(state_file, 'w') as f:
+                json.dump(save_data, f, indent=2)
                 
             self.logger.debug("System state saved successfully")
             
