@@ -12,25 +12,25 @@ class InstrumentManager:
     def _load_default_instruments(self):
         """تحميل الأدوات الافتراضية"""
         return [
-            # Forex Majors
-            {'symbol': 'EUR/USD', 'type': 'forex', 'active': True, 'pip_value': 0.0001},
-            {'symbol': 'GBP/USD', 'type': 'forex', 'active': True, 'pip_value': 0.0001},
-            {'symbol': 'USD/JPY', 'type': 'forex', 'active': True, 'pip_value': 0.01},
-            {'symbol': 'USD/CHF', 'type': 'forex', 'active': True, 'pip_value': 0.0001},
-            {'symbol': 'AUD/USD', 'type': 'forex', 'active': True, 'pip_value': 0.0001},
-            {'symbol': 'USD/CAD', 'type': 'forex', 'active': True, 'pip_value': 0.0001},
-            {'symbol': 'NZD/USD', 'type': 'forex', 'active': True, 'pip_value': 0.0001},
+            # Forex Majors - بنفس الأسماء في قاعدة البيانات
+            {'symbol': 'EURUSDm', 'type': 'forex', 'active': True, 'pip_value': 0.0001},
+            {'symbol': 'GBPUSDm', 'type': 'forex', 'active': True, 'pip_value': 0.0001},
+            {'symbol': 'USDJPYm', 'type': 'forex', 'active': True, 'pip_value': 0.01},
+            {'symbol': 'USDCHFm', 'type': 'forex', 'active': True, 'pip_value': 0.0001},
+            {'symbol': 'AUDUSDm', 'type': 'forex', 'active': True, 'pip_value': 0.0001},
+            {'symbol': 'USDCADm', 'type': 'forex', 'active': True, 'pip_value': 0.0001},
+            {'symbol': 'NZDUSDm', 'type': 'forex', 'active': True, 'pip_value': 0.0001},
             # Forex Minors
-            {'symbol': 'EUR/GBP', 'type': 'forex', 'active': True, 'pip_value': 0.0001},
-            {'symbol': 'EUR/JPY', 'type': 'forex', 'active': True, 'pip_value': 0.01},
-            {'symbol': 'GBP/JPY', 'type': 'forex', 'active': True, 'pip_value': 0.01},
-            # Commodities
-            {'symbol': 'XAU/USD', 'type': 'commodity', 'active': True, 'pip_value': 0.01},
-            {'symbol': 'XAG/USD', 'type': 'commodity', 'active': True, 'pip_value': 0.001},
-            {'symbol': 'WTI/USD', 'type': 'commodity', 'active': True, 'pip_value': 0.01},
+            {'symbol': 'EURGBPm', 'type': 'forex', 'active': True, 'pip_value': 0.0001},
+            {'symbol': 'EURJPYm', 'type': 'forex', 'active': True, 'pip_value': 0.01},
+            {'symbol': 'GBPJPYm', 'type': 'forex', 'active': True, 'pip_value': 0.01},
+            # Commodities  
+            {'symbol': 'XAUUSDm', 'type': 'commodity', 'active': True, 'pip_value': 0.01},
+            {'symbol': 'XAGUSDm', 'type': 'commodity', 'active': True, 'pip_value': 0.001},
+            {'symbol': 'WTIm', 'type': 'commodity', 'active': True, 'pip_value': 0.01},
             # Crypto
-            {'symbol': 'BTC/USD', 'type': 'crypto', 'active': True, 'pip_value': 1.0},
-            {'symbol': 'ETH/USD', 'type': 'crypto', 'active': True, 'pip_value': 0.01},
+            {'symbol': 'BTCUSDm', 'type': 'crypto', 'active': True, 'pip_value': 1.0},
+            {'symbol': 'ETHUSDm', 'type': 'crypto', 'active': True, 'pip_value': 0.01},
         ]
     
     def get_all_instruments(self):

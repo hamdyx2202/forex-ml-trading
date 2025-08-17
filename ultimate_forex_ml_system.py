@@ -234,14 +234,17 @@ class UltimateForexMLSystem:
         loop = asyncio.get_event_loop()
         
         # تشغيل التدريب في thread منفصل
-        result = await loop.run_in_executor(
-            None,
-            self.features_trainer.train_symbol,
-            symbol,
-            timeframe
-        )
-        
-        return result
+        try:
+            result = await loop.run_in_executor(
+                None,
+                self.features_trainer.train_symbol,
+                symbol,
+                timeframe
+            )
+            return result
+        except Exception as e:
+            logger.error(f"Error training {symbol} {timeframe}: {str(e)}")
+            return None
     
     async def start_continuous_learning(self):
         """بدء التعلم المستمر"""

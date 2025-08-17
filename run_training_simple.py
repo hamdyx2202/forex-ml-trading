@@ -79,10 +79,36 @@ def main():
     trainer.use_all_models = False    # استخدام نموذج واحد فقط
     trainer.max_workers = 2           # عدد أقل من المعالجات
     
-    # التدريب على رمز واحد كمثال
-    print("\n📊 Training on EUR/USD H1 as example...")
+    # الحصول على رمز من قاعدة البيانات
+    print("\n📊 Getting available symbols from database...")
     try:
-        results = trainer.train_symbol('EURUSD', 'H1')
+        conn = sqlite3.connect("data/forex_ml.db")
+        query = """
+            SELECT DISTINCT symbol, timeframe, COUNT(*) as count
+            FROM price_data
+            WHERE symbol LIKE '%USD%'
+            GROUP BY symbol, timeframe
+            HAVING count >= 1000
+            ORDER BY count DESC
+            LIMIT 5
+        """
+        available = pd.read_sql_query(query, conn)
+        conn.close()
+        
+        if len(available) == 0:
+            print("❌ No symbols with enough data found")
+            return
+            
+        print("\n📊 Available symbols with data:")
+        for idx, row in available.iterrows():
+            print(f"  {idx+1}. {row['symbol']} {row['timeframe']} - {row['count']:,} records")
+        
+        # اختيار أول رمز متاح
+        symbol = available.iloc[0]['symbol']
+        timeframe = available.iloc[0]['timeframe']
+        
+        print(f"\n🎯 Training on {symbol} {timeframe}...")
+        results = trainer.train_symbol(symbol, timeframe)
         
         if results:
             print(f"\n✅ Training completed!")
