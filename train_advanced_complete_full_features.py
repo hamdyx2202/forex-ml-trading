@@ -981,25 +981,56 @@ class UltimateAdvancedTrainer:
         if model is None:
             return None
         
-        # حفظ إذا كان جيد
-        if results['accuracy'] >= 0.85:
-            model_dir = Path(f"models/{symbol}_{timeframe}/{strategy_name}")
-            model_dir.mkdir(parents=True, exist_ok=True)
-            
-            model_data = {
-                'model': model,
-                'scaler': scaler,
-                'feature_names': feature_names,
-                'strategy': strategy,
-                'results': results,
-                'sl_tp_settings': self.sl_tp_settings[strategy_name],
-                'training_date': datetime.now(),
-                'use_all_features': self.use_all_features,
-                'use_all_models': self.use_all_models
-            }
-            
-            joblib.dump(model_data, model_dir / 'model_ultimate.pkl')
-            logger.info(f"    💾 تم حفظ النموذج")
+        # حفظ النموذج بغض النظر عن الدقة
+        model_dir = Path(f"models/{symbol}_{timeframe}/{strategy_name}")
+        model_dir.mkdir(parents=True, exist_ok=True)
+        
+        model_data = {
+            'model': model,
+            'scaler': scaler,
+            'feature_names': feature_names,
+            'strategy': strategy,
+            'results': results,
+            'sl_tp_settings': self.sl_tp_settings[strategy_name],
+            'training_date': datetime.now(),
+            'use_all_features': self.use_all_features,
+            'use_all_models': self.use_all_models
+        }
+        
+        # حفظ النموذج الرئيسي
+        model_path = model_dir / 'model_ultimate.pkl'
+        joblib.dump(model_data, model_path)
+        logger.info(f"    💾 تم حفظ النموذج في: {model_path}")
+        
+        # حفظ نسخة احتياطية مع التاريخ
+        backup_path = model_dir / f'model_{datetime.now().strftime("%Y%m%d_%H%M%S")}.pkl'
+        joblib.dump(model_data, backup_path)
+        
+        # إضافة مسار النموذج للنتائج
+        results['model_path'] = str(model_path)
+        results['model'] = model
+        results['scaler'] = scaler
+        
+        # حفظ ملف معلومات النموذج
+        info_path = model_dir / 'model_info.json'
+        info_data = {
+            'symbol': symbol,
+            'timeframe': timeframe,
+            'strategy_name': strategy_name,
+            'accuracy': results['accuracy'],
+            'precision': results['precision'],
+            'recall': results['recall'],
+            'f1': results['f1'],
+            'models_count': results['models_count'],
+            'training_date': datetime.now().isoformat(),
+            'feature_count': len(feature_names),
+            'training_samples': len(X_train)
+        }
+        
+        with open(info_path, 'w') as f:
+            json.dump(info_data, f, indent=2)
+        
+        logger.info(f"    ✅ النموذج محفوظ: دقة {results['accuracy']:.4f}")
         
         return results
     
