@@ -21,7 +21,7 @@ sys.path.append(os.path.join(current_dir, 'src'))
 
 # Import all components
 from train_advanced_complete_ultimate import UltimateAdvancedTrainer
-from train_advanced_complete_full_features import UltimateFeaturesTrainer
+from train_advanced_complete_full_features import UltimateAdvancedTrainer as UltimateFeaturesTrainer
 from continuous_learning_ultimate import ContinuousLearningSystem
 from hypothesis_system import HypothesisManager
 from instrument_manager import InstrumentManager
