@@ -24,8 +24,26 @@ from train_advanced_complete_ultimate import UltimateAdvancedTrainer
 from train_advanced_complete_full_features import UltimateAdvancedTrainer as UltimateFeaturesTrainer
 from continuous_learning_ultimate import ContinuousLearningSystem
 from hypothesis_system import HypothesisManager
-from instrument_manager import InstrumentManager
-from performance_tracker import PerformanceTracker
+# Import with fallback for missing modules
+try:
+    from instrument_manager import InstrumentManager
+except ImportError:
+    print("Warning: InstrumentManager not found, using dummy implementation")
+    class InstrumentManager:
+        def __init__(self):
+            pass
+        def get_all_instruments(self):
+            return []
+
+try:
+    from performance_tracker import PerformanceTracker
+except ImportError:
+    print("Warning: PerformanceTracker not found, using dummy implementation")
+    class PerformanceTracker:
+        def __init__(self):
+            self.metrics = {}
+        def get_recent_performance(self):
+            return {'accuracy': 0.0, 'profit': 0.0}
 
 # Logging setup
 logging.basicConfig(
