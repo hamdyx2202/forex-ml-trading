@@ -187,8 +187,13 @@ def train_simple_model(system, symbol, timeframe, df):
         from sklearn.preprocessing import RobustScaler
         from sklearn.model_selection import train_test_split
         
-        # حساب ميزات بسيطة
-        features = pd.DataFrame()
+        # التأكد من أن df له index
+        if not isinstance(df.index, pd.DatetimeIndex) and 'time' in df.columns:
+            df['time'] = pd.to_datetime(df['time'])
+            df.set_index('time', inplace=True)
+        
+        # حساب ميزات بسيطة مع الحفاظ على نفس الـ index
+        features = pd.DataFrame(index=df.index)
         
         # المتوسطات المتحركة
         features['sma_20'] = df['close'].rolling(20).mean()
@@ -206,6 +211,12 @@ def train_simple_model(system, symbol, timeframe, df):
         features['price_change'] = df['close'].pct_change()
         features['high_low_ratio'] = df['high'] / df['low']
         
+        # إضافة الأسعار الأساسية
+        features['open'] = df['open']
+        features['high'] = df['high']
+        features['low'] = df['low']
+        features['close'] = df['close']
+        
         # إزالة NaN
         features = features.dropna()
         
@@ -214,16 +225,25 @@ def train_simple_model(system, symbol, timeframe, df):
         
         # إنشاء الهدف
         y = (df['close'].shift(-1) > df['close']).astype(int)
-        y = y[features.index]
         
-        # محاذاة البيانات
-        common_index = features.index.intersection(y.index)
+        # محاذاة البيانات - التأكد من أن features و y لهما نفس الـ index
+        common_index = features.index.intersection(y.index).intersection(df.index)
         X = features.loc[common_index]
         y = y.loc[common_index]
+        df_aligned = df.loc[common_index]
         
         if len(X) < 100:
             return False
         
+        # إزالة آخر صف (لأن shift(-1) يخلق NaN في آخر صف)
+        X = X[:-1]
+        y = y[:-1]
+        
+        # التحقق من التطابق
+        if len(X) != len(y):
+            logger.error(f"عدم تطابق: X={len(X)}, y={len(y)}")
+            return False
+            
         # تقسيم البيانات
         X_train, X_test, y_train, y_test = train_test_split(
             X.values, y.values, test_size=0.2, random_state=42
