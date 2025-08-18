@@ -197,9 +197,27 @@ class OptimizedForexSystem:
             
             # إعداد البيانات للتدريب
             X = features.values
-            y = (df['close'].shift(-1) > df['close']).astype(int)
-            y = y[features.index].values[:-1]
+            
+            # حساب الهدف - هل سيرتفع السعر في الشمعة التالية؟
+            # نستخدم البيانات الأصلية df لحساب y
+            y_series = (df['close'].shift(-1) > df['close']).astype(int)
+            
+            # محاذاة y مع features
+            # features قد تحتوي على صفوف أقل بسبب dropna()
+            y_aligned = y_series.loc[features.index]
+            
+            # حذف آخر صف من كليهما (لأن shift(-1) يخلق NaN في آخر صف)
             X = X[:-1]
+            y = y_aligned.iloc[:-1].values
+            
+            # التحقق النهائي
+            if len(X) != len(y):
+                logger.error(f"خطأ في المحاذاة: X={len(X)}, y={len(y)}")
+                # استخدم أصغر حجم
+                min_len = min(len(X), len(y))
+                X = X[:min_len]
+                y = y[:min_len]
+                logger.info(f"تم التصحيح إلى {min_len} عينة")
             
             # تقسيم البيانات
             X_train, X_test, y_train, y_test = train_test_split(
