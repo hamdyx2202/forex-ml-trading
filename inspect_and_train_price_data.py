@@ -71,9 +71,9 @@ def train_from_price_data():
     
     try:
         # استيراد النظام
-        from complete_forex_ml_server import CompleteForexMLSystem
-        system = CompleteForexMLSystem()
-        system.historical_db = db_path
+        from optimized_forex_server import OptimizedForexSystem
+        system = OptimizedForexSystem()
+        system.db_path = db_path
         
         conn = sqlite3.connect(db_path)
         
