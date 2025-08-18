@@ -1,0 +1,54 @@
+# Virtual Environment
+venv/
+venv_pro/
+env/
+ENV/
+
+# Data directories
+data/
+*.db
+*.sqlite
+*.sqlite3
+
+# Source directory (if temporary)
+src/
+
+# Logs
+*.log
+logs/
+
+# Models
+trained_models/
+*.pkl
+*.h5
+*.model
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Environment variables
+.env
+.env.local
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
