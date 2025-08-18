@@ -691,24 +691,36 @@ class UltimateAdvancedTrainer:
         
         logger.info(f"    • إنشاء أهداف {strategy_name} ({strategy['description']})...")
         
-        for i in range(len(df) - lookahead):
-            future_prices = df['close'].iloc[i+1:i+lookahead+1].values
-            future_highs = df['high'].iloc[i+1:i+lookahead+1].values
-            future_lows = df['low'].iloc[i+1:i+lookahead+1].values
-            current_price = df['close'].iloc[i]
+        # معالجة على دفعات لتحسين الأداء
+        batch_size = 5000
+        total_samples = len(df) - lookahead
+        
+        for batch_start in range(0, total_samples, batch_size):
+            batch_end = min(batch_start + batch_size, total_samples)
             
-            # حركة مع الـ wicks
-            max_up = (future_highs.max() - current_price) / pip_value
-            max_down = (current_price - future_lows.min()) / pip_value
+            # عرض التقدم
+            if batch_start % 10000 == 0:
+                progress = (batch_start / total_samples) * 100
+                logger.info(f"      Progress: {progress:.1f}% ({batch_start}/{total_samples})")
             
-            # حركة الإغلاق
-            close_up = (future_prices.max() - current_price) / pip_value
-            close_down = (current_price - future_prices.min()) / pip_value
+            for i in range(batch_start, batch_end):
+                future_prices = df['close'].iloc[i+1:i+lookahead+1].values
+                future_highs = df['high'].iloc[i+1:i+lookahead+1].values
+                future_lows = df['low'].iloc[i+1:i+lookahead+1].values
+                current_price = df['close'].iloc[i]
             
-            # تحديد نوع الصفقة
-            if max_up >= min_pips * 2 and close_up >= min_pips * 1.5:
-                # Long
-                targets.append(2)
+                # حركة مع الـ wicks
+                max_up = (future_highs.max() - current_price) / pip_value
+                max_down = (current_price - future_lows.min()) / pip_value
+                
+                # حركة الإغلاق
+                close_up = (future_prices.max() - current_price) / pip_value
+                close_down = (current_price - future_prices.min()) / pip_value
+                
+                # تحديد نوع الصفقة
+                if max_up >= min_pips * 2 and close_up >= min_pips * 1.5:
+                    # Long
+                    targets.append(2)
                 
                 confidence = min(
                     0.5 + (close_up / (min_pips * 4)) * 0.3 +
