@@ -721,43 +721,47 @@ class UltimateAdvancedTrainer:
                 if max_up >= min_pips * 2 and close_up >= min_pips * 1.5:
                     # Long
                     targets.append(2)
-                
-                confidence = min(
-                    0.5 + (close_up / (min_pips * 4)) * 0.3 +
-                    (1 - max_down / max_up) * 0.2,
-                    1.0
-                )
-                confidences.append(confidence)
-                
-                sl_tp = self.calculate_dynamic_sl_tp(df, 'long', i, strategy_name)
-                sl_tp_info.append(sl_tp)
-                
-                quality = self.evaluate_trade_quality(df, i, 'long', sl_tp, max_up, max_down)
-                trade_quality.append(quality)
-                
-            elif max_down >= min_pips * 2 and close_down >= min_pips * 1.5:
-                # Short
-                targets.append(0)
-                
-                confidence = min(
-                    0.5 + (close_down / (min_pips * 4)) * 0.3 +
-                    (1 - max_up / max_down) * 0.2,
-                    1.0
-                )
-                confidences.append(confidence)
-                
-                sl_tp = self.calculate_dynamic_sl_tp(df, 'short', i, strategy_name)
-                sl_tp_info.append(sl_tp)
-                
-                quality = self.evaluate_trade_quality(df, i, 'short', sl_tp, max_up, max_down)
-                trade_quality.append(quality)
-                
-            else:
-                # Hold
-                targets.append(1)
-                confidences.append(0.5)
-                sl_tp_info.append(None)
-                trade_quality.append(0)
+                    
+                    confidence = min(
+                        0.5 + (close_up / (min_pips * 4)) * 0.3 +
+                        (1 - max_down / max_up) * 0.2,
+                        1.0
+                    )
+                    confidences.append(confidence)
+                    
+                    sl_tp = self.calculate_dynamic_sl_tp(df, 'long', i, strategy_name)
+                    sl_tp_info.append(sl_tp)
+                    
+                    quality = self.evaluate_trade_quality(df, i, 'long', sl_tp, max_up, max_down)
+                    trade_quality.append(quality)
+                    
+                elif max_down >= min_pips * 2 and close_down >= min_pips * 1.5:
+                    # Short
+                    targets.append(0)
+                    
+                    confidence = min(
+                        0.5 + (close_down / (min_pips * 4)) * 0.3 +
+                        (1 - max_up / max_down) * 0.2,
+                        1.0
+                    )
+                    confidences.append(confidence)
+                    
+                    sl_tp = self.calculate_dynamic_sl_tp(df, 'short', i, strategy_name)
+                    sl_tp_info.append(sl_tp)
+                    
+                    quality = self.evaluate_trade_quality(df, i, 'short', sl_tp, max_up, max_down)
+                    trade_quality.append(quality)
+                    
+                else:
+                    # Hold
+                    targets.append(1)
+                    confidences.append(0.5)
+                    sl_tp_info.append(None)
+                    trade_quality.append(0)
+            
+            # تنظيف الذاكرة كل دفعة
+            if batch_end % 10000 == 0:
+                gc.collect()
         
         # ملء الأخير
         targets.extend([1] * lookahead)
