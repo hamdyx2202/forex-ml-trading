@@ -4,27 +4,11 @@
 يحلل السنوات الماضية ويتعلم من الصفقات الافتراضية
 """
 
-import sys
-import os
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-
-# Linux compatibility
-try:
-    import src.linux_compatibility
-except:
-    pass
-
 from src.advanced_learner import AdvancedLearner
+from src.data_collector import MT5DataCollector
 from loguru import logger
 import json
 from datetime import datetime
-
-# Try to import MT5DataCollector
-try:
-    from src.data_collector import MT5DataCollector
-except ImportError:
-    logger.warning("MT5DataCollector not available - using mock data")
-    MT5DataCollector = None
 
 
 def main():
