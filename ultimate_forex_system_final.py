@@ -576,13 +576,13 @@ class UltimateTradingSystem:
                 # فحص كل رمز
                 for symbol in self.config['symbols']:
                     # توليد إشارات لكل إطار زمني
-                    for strategy in self.strategies.values():
+                    for strategy_name, strategy in self.strategies.items():
                         signal = self.generate_signal(symbol, strategy['timeframe'])
                         
                         if signal:
                             self.active_signals.append(signal)
                             
-                            # إرسال للاكسبيرت (يحتاج تطوير API)
+                            # إرسال للاكسبيرت
                             await self.send_to_expert(signal)
                 
                 # انتظار دقيقة
