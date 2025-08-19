@@ -24,6 +24,13 @@ from sklearn.metrics import accuracy_score
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier, ExtraTreesClassifier
 from sklearn.neural_network import MLPClassifier
 
+# Import Model Manager
+try:
+    from model_manager import ModelManager
+    MODEL_MANAGER_AVAILABLE = True
+except:
+    MODEL_MANAGER_AVAILABLE = False
+
 # Optional libraries
 try:
     import lightgbm as lgb
@@ -59,6 +66,14 @@ class AdvancedMLSystem:
         self.models_dir = './trained_models'
         
         os.makedirs(self.models_dir, exist_ok=True)
+        
+        # Initialize Model Manager
+        if MODEL_MANAGER_AVAILABLE:
+            self.model_manager = ModelManager(self.models_dir)
+            logger.info("✅ Model Manager initialized")
+        else:
+            self.model_manager = None
+            
         self.load_existing_models()
         
         logger.info(f"✅ Advanced ML System initialized - {len(self.models)} models loaded")
@@ -205,8 +220,8 @@ class AdvancedMLSystem:
         
         return features
     
-    def train_all_models(self, symbol, timeframe):
-        """تدريب 6 نماذج ML"""
+    def train_all_models(self, symbol, timeframe, train_sl_tp=True):
+        """تدريب 6 نماذج ML + نماذج SL/TP الذكية"""
         try:
             logger.info(f"🤖 Training {symbol} {timeframe} with all models...")
             
@@ -370,15 +385,30 @@ class AdvancedMLSystem:
             # Save models
             self.models[key] = models
             
-            # Save to disk
+            # Save to disk and register with manager
             for model_name, model in models.items():
                 model_path = os.path.join(self.models_dir, f"{symbol}_{timeframe}_{model_name}.pkl")
                 joblib.dump(model, model_path)
+                
+                # Register with Model Manager
+                if self.model_manager and model_name in accuracies:
+                    self.model_manager.register_model(
+                        model_path=model_path,
+                        accuracy=accuracies[model_name],
+                        symbol=symbol,
+                        timeframe=timeframe,
+                        model_type=model_name
+                    )
             
             scaler_path = os.path.join(self.models_dir, f"{symbol}_{timeframe}_scaler.pkl")
             joblib.dump(scaler, scaler_path)
             
             logger.info(f"✅ Trained {len(models)} models for {symbol} {timeframe}")
+            
+            # تدريب نماذج SL/TP الذكية
+            if train_sl_tp and len(df) > 2000:
+                self.train_optimal_sl_tp(symbol, timeframe, df, features)
+            
             return True
             
         except Exception as e:
@@ -451,6 +481,91 @@ class AdvancedMLSystem:
         except Exception as e:
             logger.error(f"Ensemble prediction error: {e}")
             return self.simple_prediction(df)
+    
+    def train_optimal_sl_tp(self, symbol, timeframe, df, features_df):
+        """تدريب نموذج لتحديد أفضل SL/TP بناءً على التاريخ"""
+        try:
+            logger.info(f"   🎯 Training optimal SL/TP for {symbol} {timeframe}...")
+            
+            # حساب النتائج التاريخية لمختلف مستويات SL/TP
+            pip_value = 0.01 if 'JPY' in symbol else 0.0001
+            
+            # إنشاء dataset للتدريب
+            sl_tp_data = []
+            
+            # اختبار مستويات مختلفة
+            sl_levels = [20, 30, 40, 50, 60, 80, 100, 120, 150]
+            tp_ratios = [1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0]
+            
+            for i in range(100, len(df) - 100):
+                entry_price = df['close'].iloc[i]
+                
+                # الميزات عند نقطة الدخول
+                if i < len(features_df):
+                    entry_features = features_df.iloc[i].to_dict()
+                    
+                    # اختبار كل مجموعة SL/TP
+                    for sl_pips in sl_levels:
+                        for tp_ratio in tp_ratios:
+                            tp_pips = sl_pips * tp_ratio
+                            
+                            # حساب النتيجة
+                            sl_price = entry_price - (sl_pips * pip_value)
+                            tp_price = entry_price + (tp_pips * pip_value)
+                            
+                            # تتبع السعر للأمام
+                            future_prices = df['close'].iloc[i+1:i+101]
+                            future_lows = df['low'].iloc[i+1:i+101]
+                            future_highs = df['high'].iloc[i+1:i+101]
+                            
+                            # هل وصل TP أو SL؟
+                            hit_sl = (future_lows <= sl_price).any()
+                            hit_tp = (future_highs >= tp_price).any()
+                            
+                            if hit_tp and not hit_sl:
+                                result = 1  # ربح
+                                profit = tp_pips
+                            elif hit_sl:
+                                result = 0  # خسارة
+                                profit = -sl_pips
+                            else:
+                                result = 0.5  # لم يصل لأي هدف
+                                profit = 0
+                            
+                            # إضافة للداتا
+                            record = {
+                                'sl_pips': sl_pips,
+                                'tp_pips': tp_pips,
+                                'tp_ratio': tp_ratio,
+                                'result': result,
+                                'profit': profit,
+                                **entry_features  # إضافة كل الميزات
+                            }
+                            sl_tp_data.append(record)
+            
+            if sl_tp_data:
+                # تحويل لـ DataFrame وتدريب نموذج
+                sl_tp_df = pd.DataFrame(sl_tp_data)
+                
+                # حساب أفضل SL/TP لكل مجموعة ميزات
+                best_params = sl_tp_df.groupby(['sl_pips', 'tp_ratio'])['result'].mean()
+                best_sl, best_ratio = best_params.idxmax()
+                
+                logger.info(f"   ✅ Best SL: {best_sl} pips, TP Ratio: {best_ratio}")
+                
+                # حفظ المعلمات الأمثل
+                key = f"{symbol}_{timeframe}"
+                if not hasattr(self, 'optimal_sl_tp'):
+                    self.optimal_sl_tp = {}
+                    
+                self.optimal_sl_tp[key] = {
+                    'sl_pips': best_sl,
+                    'tp_ratio': best_ratio,
+                    'success_rate': best_params.max()
+                }
+                
+        except Exception as e:
+            logger.error(f"   ❌ SL/TP training error: {str(e)}")
     
     def simple_prediction(self, df):
         """Simple fallback prediction"""
@@ -569,20 +684,37 @@ def predict():
         else:
             action = 'NONE'
         
-        # Calculate SL/TP
-        atr = df['high'].rolling(14).max().iloc[-1] - df['low'].rolling(14).min().iloc[-1]
-        sl_distance = max(min(atr * 1.5, 100 * pip_value), 30 * pip_value)
+        # Calculate SL/TP - استخدام القيم المدربة إذا متاحة
+        key = f"{clean_symbol}_{timeframe}"
+        
+        if hasattr(system, 'optimal_sl_tp') and key in system.optimal_sl_tp:
+            # استخدام SL/TP الأمثل المدرب
+            optimal = system.optimal_sl_tp[key]
+            sl_pips = optimal['sl_pips']
+            tp_ratio = optimal['tp_ratio']
+            tp1_pips = sl_pips * tp_ratio
+            tp2_pips = sl_pips * (tp_ratio + 1)
+            
+            logger.info(f"   📊 Using trained SL/TP: {sl_pips} pips, ratio {tp_ratio}")
+        else:
+            # القيم الافتراضية
+            atr = df['high'].rolling(14).max().iloc[-1] - df['low'].rolling(14).min().iloc[-1]
+            sl_distance = max(min(atr * 1.5, 100 * pip_value), 30 * pip_value)
+            sl_pips = sl_distance / pip_value
+            tp1_pips = sl_pips * 2
+            tp2_pips = sl_pips * 3
         
         if action == 'BUY':
-            sl_price = current_price - sl_distance
-            tp1_price = current_price + (sl_distance * 2)
-            tp2_price = current_price + (sl_distance * 3)
+            sl_price = current_price - (sl_pips * pip_value)
+            tp1_price = current_price + (tp1_pips * pip_value)
+            tp2_price = current_price + (tp2_pips * pip_value)
         elif action == 'SELL':
-            sl_price = current_price + sl_distance
-            tp1_price = current_price - (sl_distance * 2)
-            tp2_price = current_price - (sl_distance * 3)
+            sl_price = current_price + (sl_pips * pip_value)
+            tp1_price = current_price - (tp1_pips * pip_value)
+            tp2_price = current_price - (tp2_pips * pip_value)
         else:
             sl_price = tp1_price = tp2_price = current_price
+            sl_pips = tp1_pips = tp2_pips = 0
         
         response = {
             'symbol': symbol,
