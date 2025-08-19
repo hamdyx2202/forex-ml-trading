@@ -6,14 +6,19 @@
 import requests
 import json
 import time
+import sys
+
+# Server URL - يمكن تمريره كمعامل أو استخدام القيمة الافتراضية
+SERVER_URL = sys.argv[1] if len(sys.argv) > 1 else "http://69.62.121.53:5000"
 
 print("🧪 Testing Enhanced ML Trading System")
+print(f"🌐 Server: {SERVER_URL}")
 print("="*50)
 
 # Test server connection
 print("\n📡 Testing server connection...")
 try:
-    response = requests.get("http://localhost:5000/status", timeout=5)
+    response = requests.get(f"{SERVER_URL}/status", timeout=10)
     if response.status_code == 200:
         status = response.json()
         print("✅ Server is running!")
@@ -26,7 +31,8 @@ try:
         exit(1)
 except Exception as e:
     print(f"❌ Connection failed: {e}")
-    print("   Make sure the server is running: python3 enhanced_ml_server.py")
+    print(f"   Make sure the server is running at: {SERVER_URL}")
+    print("   To test local server: python3 test_enhanced_system.py http://localhost:5000")
     exit(1)
 
 # Test prediction with sample data
@@ -69,7 +75,7 @@ for i in range(200):
 print("\n🤖 Sending prediction request...")
 try:
     response = requests.post(
-        "http://localhost:5000/predict",
+        f"{SERVER_URL}/predict",
         json=test_data,
         timeout=60
     )
@@ -118,7 +124,7 @@ except Exception as e:
 # Test risk report
 print("\n\n💼 Testing risk report...")
 try:
-    response = requests.get("http://localhost:5000/risk_report", timeout=5)
+    response = requests.get(f"{SERVER_URL}/risk_report", timeout=5)
     if response.status_code == 200:
         report = response.json()
         print("✅ Risk report received!")
@@ -134,7 +140,7 @@ except Exception as e:
 # Test models endpoint
 print("\n\n🤖 Testing models endpoint...")
 try:
-    response = requests.get("http://localhost:5000/models", timeout=5)
+    response = requests.get(f"{SERVER_URL}/models", timeout=5)
     if response.status_code == 200:
         models = response.json()
         print("✅ Models information:")
