@@ -24,18 +24,62 @@ logger = logging.getLogger(__name__)
 
 def get_all_available_pairs():
     """جلب جميع الأزواج المتاحة من قاعدة البيانات"""
-    conn = sqlite3.connect('./data/forex_ml.db')
-    query = """
-    SELECT symbol, COUNT(*) as count 
-    FROM price_data 
-    WHERE timeframe = 'M15'
-    GROUP BY symbol 
-    HAVING count > 2000
-    ORDER BY count DESC
-    """
-    pairs = pd.read_sql_query(query, conn)
-    conn.close()
-    return pairs
+    db_path = './data/forex_ml.db'
+    
+    # تحقق من وجود قاعدة البيانات
+    if not os.path.exists(db_path):
+        logger.error(f"❌ Database not found at: {db_path}")
+        logger.info("   Please ensure the database exists with price data")
+        return pd.DataFrame()
+    
+    try:
+        conn = sqlite3.connect(db_path)
+        
+        # تحقق من وجود جدول price_data
+        cursor = conn.cursor()
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='price_data'")
+        if not cursor.fetchone():
+            logger.error("❌ Table 'price_data' not found in database")
+            conn.close()
+            return pd.DataFrame()
+        
+        query = """
+        SELECT symbol, COUNT(*) as count 
+        FROM price_data 
+        WHERE timeframe = 'M15'
+        GROUP BY symbol 
+        HAVING count > 2000
+        ORDER BY count DESC
+        """
+        pairs = pd.read_sql_query(query, conn)
+        conn.close()
+        
+        if pairs.empty:
+            logger.warning("⚠️ No pairs found with sufficient data (>2000 M15 candles)")
+            logger.info("   Checking all available data...")
+            
+            # عرض ما هو متاح
+            conn = sqlite3.connect(db_path)
+            query_all = """
+            SELECT symbol, timeframe, COUNT(*) as count 
+            FROM price_data 
+            GROUP BY symbol, timeframe 
+            ORDER BY count DESC
+            LIMIT 20
+            """
+            all_data = pd.read_sql_query(query_all, conn)
+            conn.close()
+            
+            if not all_data.empty:
+                logger.info("\n📊 Available data in database:")
+                for _, row in all_data.iterrows():
+                    logger.info(f"   - {row['symbol']} ({row['timeframe']}): {row['count']:,} candles")
+        
+        return pairs
+        
+    except Exception as e:
+        logger.error(f"❌ Database error: {e}")
+        return pd.DataFrame()
 
 def get_priority_pairs():
     """الأزواج ذات الأولوية للتدريب"""
@@ -59,6 +103,16 @@ def main():
     # جلب جميع الأزواج
     pairs_df = get_all_available_pairs()
     logger.info(f"\n📊 عدد الأزواج المتاحة: {len(pairs_df)}")
+    
+    # التحقق من وجود بيانات
+    if pairs_df.empty:
+        logger.error("\n❌ No pairs available for training!")
+        logger.info("\n💡 Troubleshooting steps:")
+        logger.info("   1. Check database path: ./data/forex_ml.db")
+        logger.info("   2. Ensure database contains price_data table")
+        logger.info("   3. Ensure sufficient M15 data (>2000 candles per pair)")
+        logger.info("   4. Run data collection script first if database is empty")
+        return
     
     # ترتيب الأزواج حسب الأولوية
     priority_pairs = get_priority_pairs()
@@ -150,7 +204,8 @@ def main():
             logger.info(f"   ✅ Models trained: {total_models}")
             logger.info(f"   ❌ Failed: {failed_models}")
             logger.info(f"   ⏰ Elapsed: {elapsed_total/60:.1f} minutes")
-            logger.info(f"   📈 Success rate: {(total_models/(total_models+failed_models)*100):.1f}%")
+            if (total_models + failed_models) > 0:
+                logger.info(f"   📈 Success rate: {(total_models/(total_models+failed_models)*100):.1f}%")
             
             # Risk management status
             risk_report = system.risk_manager.get_risk_report()
@@ -166,7 +221,13 @@ def main():
     logger.info(f"✅ Models trained: {total_models}")
     logger.info(f"❌ Failed: {failed_models}")
     logger.info(f"⏰ Total time: {total_time/60:.1f} minutes")
-    logger.info(f"🎯 Success rate: {(total_models/(total_models+failed_models)*100):.1f}%")
+    
+    # تجنب القسمة على صفر
+    if (total_models + failed_models) > 0:
+        success_rate = (total_models/(total_models+failed_models)*100)
+        logger.info(f"🎯 Success rate: {success_rate:.1f}%")
+    else:
+        logger.info(f"⚠️ No models were trained - check database connection")
     logger.info(f"📁 Models saved in: ./trained_models/")
     
     logger.info(f"\n💡 System Capabilities:")
