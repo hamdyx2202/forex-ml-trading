@@ -79,7 +79,7 @@ class EnhancedMLTradingSystem:
         self.risk_manager = RiskManagementSystem(initial_balance=10000)
         
         # Trading parameters
-        self.min_market_score = 40  # الحد الأدنى لقوة السوق
+        self.min_market_score = 20  # خفضنا من 40 إلى 20
         self.max_daily_trades = 10  # حد أقصى للصفقات اليومية
         self.trade_cooldown = {}    # فترة انتظار بين الصفقات
         
@@ -264,9 +264,11 @@ class EnhancedMLTradingSystem:
                         # Store market score for filtering
                         market_scores.append(market_context['score'])
             
-            if len(X_list) < 500:
-                logger.warning("Not enough training samples")
+            if len(X_list) < 100:  # خفضنا من 500 إلى 100
+                logger.warning(f"Not enough training samples: {len(X_list)} < 100")
                 return False
+            
+            logger.info(f"   ✅ Prepared {len(X_list)} training samples")
             
             # Convert to arrays
             X = np.array(X_list)
