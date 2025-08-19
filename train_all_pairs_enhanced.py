@@ -22,7 +22,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-def get_all_available_pairs():
+def get_all_available_pairs(min_candles=1000):  # خفضنا من 2000 إلى 1000
     """جلب جميع الأزواج المتاحة من قاعدة البيانات"""
     db_path = './data/forex_ml.db'
     
@@ -43,19 +43,19 @@ def get_all_available_pairs():
             conn.close()
             return pd.DataFrame()
         
-        query = """
+        query = f"""
         SELECT symbol, COUNT(*) as count 
         FROM price_data 
         WHERE timeframe = 'M15'
         GROUP BY symbol 
-        HAVING count > 2000
+        HAVING count > {min_candles}
         ORDER BY count DESC
         """
         pairs = pd.read_sql_query(query, conn)
         conn.close()
         
         if pairs.empty:
-            logger.warning("⚠️ No pairs found with sufficient data (>2000 M15 candles)")
+            logger.warning(f"⚠️ No pairs found with sufficient data (>{min_candles} M15 candles)")
             logger.info("   Checking all available data...")
             
             # عرض ما هو متاح
@@ -110,8 +110,8 @@ def main():
         logger.info("\n💡 Troubleshooting steps:")
         logger.info("   1. Check database path: ./data/forex_ml.db")
         logger.info("   2. Ensure database contains price_data table")
-        logger.info("   3. Ensure sufficient M15 data (>2000 candles per pair)")
-        logger.info("   4. Run data collection script first if database is empty")
+        logger.info(f"   3. Ensure sufficient M15 data (>{min_candles} candles per pair)")
+        logger.info("   4. Run: python3 full_data_merger.py")
         return
     
     # ترتيب الأزواج حسب الأولوية
