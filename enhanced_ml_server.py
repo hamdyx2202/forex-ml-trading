@@ -568,21 +568,24 @@ class EnhancedMLTradingSystem:
             
             final_confidence = min(0.95, base_confidence * confidence_multiplier)
             
-            # Determine action
-            if buy_ratio > 0.6 and market_score > 20:
+            # Determine action - خفضنا المتطلبات
+            if buy_ratio > 0.55 and market_score > 5:  # كان 0.6 و 20
                 action = 0  # BUY
                 direction = 'BUY'
-            elif buy_ratio < 0.4 and market_score < -20:
+            elif buy_ratio < 0.45 and market_score < -5:  # كان 0.4 و -20
                 action = 1  # SELL
                 direction = 'SELL'
             else:
                 action = 2  # HOLD
                 direction = 'HOLD'
             
-            # Override if confidence too low or market conditions unfavorable
-            if final_confidence < 0.65 or abs(market_score) < self.min_market_score:
+            # Override if confidence too low - خفضنا من 0.65 إلى 0.55
+            if final_confidence < 0.55:
                 action = 2  # HOLD
                 direction = 'HOLD'
+                logger.info(f"   ⚠️ HOLD due to low confidence: {final_confidence:.1%}")
+            
+            # لا نتحقق من market score مرة أخرى - أزلنا الشرط المكرر
             
             logger.info(f"   🎯 Ensemble: {buy_votes}/{total_votes} buy votes")
             logger.info(f"   📊 Final: {direction} with {final_confidence:.1%} confidence")
@@ -1113,7 +1116,7 @@ def predict():
         # Determine signal with risk management
         current_price = float(df['close'].iloc[-1])
         
-        if action != 'HOLD' and confidence >= 0.65:
+        if action != 'HOLD' and confidence >= 0.55:  # خفضنا من 0.65 إلى 0.55
             # Check risk management approval
             sl_tp_info = system.calculate_dynamic_sl_tp(
                 clean_symbol, action, current_price, market_context
