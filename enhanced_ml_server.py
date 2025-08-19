@@ -501,9 +501,9 @@ class EnhancedMLTradingSystem:
             
             # Train if no model exists
             if key not in self.models:
-                logger.info(f"Training new enhanced models for {key}...")
-                if not self.train_enhanced_models(symbol, timeframe):
-                    return self._simple_prediction(df)
+                logger.warning(f"   ⚠️ No models found for {key}")
+                logger.info(f"   🤖 Available models: {list(self.models.keys())}")
+                return self._simple_prediction(df)
             
             # Get predictions from all models
             X = features.values[-1:]
@@ -608,6 +608,34 @@ class EnhancedMLTradingSystem:
     def calculate_dynamic_sl_tp(self, symbol, direction, entry_price, market_context):
         """حساب SL/TP ذكي بناءً على سياق السوق"""
         pip_value = 0.01 if 'JPY' in symbol else 0.0001
+        
+        # Handle None market_context with default values
+        if market_context is None:
+            # Use fixed percentages when no market context available
+            logger.warning(f"No market context for {symbol}, using default SL/TP")
+            sl_percentage = 0.002  # 0.2% default stop loss
+            tp1_percentage = 0.003  # 0.3% default TP1
+            tp2_percentage = 0.005  # 0.5% default TP2
+            
+            if direction == 'BUY':
+                sl_price = entry_price * (1 - sl_percentage)
+                tp1_price = entry_price * (1 + tp1_percentage)
+                tp2_price = entry_price * (1 + tp2_percentage)
+            else:  # SELL
+                sl_price = entry_price * (1 + sl_percentage)
+                tp1_price = entry_price * (1 - tp1_percentage)
+                tp2_price = entry_price * (1 - tp2_percentage)
+            
+            return {
+                'sl_price': float(sl_price),
+                'tp1_price': float(tp1_price),
+                'tp2_price': float(tp2_price),
+                'sl_pips': float(sl_percentage * 10000),
+                'tp1_pips': float(tp1_percentage * 10000),
+                'tp2_pips': float(tp2_percentage * 10000),
+                'risk_reward_ratio': float(tp1_percentage / sl_percentage),
+                'based_on': 'default_percentages'
+            }
         
         # Get ATR for volatility-based stops
         atr = market_context['volatility']['atr']
@@ -737,42 +765,73 @@ class EnhancedMLTradingSystem:
         }
     
     def _simple_prediction(self, df):
-        """Simple fallback prediction"""
+        """Simple fallback prediction - استراتيجية بسيطة نشطة"""
         try:
             latest = df.iloc[-1]
-            sma20 = df['close'].rolling(20).mean().iloc[-1]
-            sma50 = df['close'].rolling(50).mean().iloc[-1]
+            close = latest['close']
             
-            if latest['close'] > sma20 > sma50:
+            # حساب المتوسطات
+            sma10 = df['close'].rolling(10).mean().iloc[-1]
+            sma20 = df['close'].rolling(20).mean().iloc[-1]
+            
+            # RSI
+            delta = df['close'].diff()
+            gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+            loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+            rs = gain.iloc[-1] / loss.iloc[-1] if loss.iloc[-1] != 0 else 0
+            rsi = 100 - (100 / (1 + rs))
+            
+            # Momentum
+            momentum = (close - df['close'].iloc[-10]) / df['close'].iloc[-10] * 100
+            
+            logger.info(f"   📊 Simple Analysis: SMA10={sma10:.5f}, SMA20={sma20:.5f}, RSI={rsi:.1f}, Momentum={momentum:.2f}%")
+            
+            # قرار الشراء
+            if close > sma10 and sma10 > sma20 and rsi < 70 and momentum > 0:
+                confidence = 0.60 if rsi < 60 else 0.58
                 return {
                     'action': 0,
                     'direction': 'BUY',
-                    'confidence': 0.60,
+                    'confidence': confidence,
                     'market_context': None,
                     'buy_votes': 1,
                     'total_votes': 1,
-                    'models_used': ['simple_ma']
+                    'models_used': ['simple_strategy']
                 }
-            elif latest['close'] < sma20 < sma50:
+            # قرار البيع
+            elif close < sma10 and sma10 < sma20 and rsi > 30 and momentum < 0:
+                confidence = 0.60 if rsi > 40 else 0.58
                 return {
                     'action': 1,
                     'direction': 'SELL',
-                    'confidence': 0.60,
+                    'confidence': confidence,
                     'market_context': None,
                     'buy_votes': 0,
                     'total_votes': 1,
-                    'models_used': ['simple_ma']
+                    'models_used': ['simple_strategy']
                 }
             else:
-                return {
-                    'action': 2,
-                    'direction': 'HOLD',
-                    'confidence': 0.50,
-                    'market_context': None,
-                    'buy_votes': 0,
-                    'total_votes': 0,
-                    'models_used': ['simple_ma']
-                }
+                # حتى في HOLD، نعطي اتجاه محتمل
+                if close > sma20:
+                    return {
+                        'action': 2,
+                        'direction': 'HOLD',
+                        'confidence': 0.52,
+                        'market_context': None,
+                        'buy_votes': 1,
+                        'total_votes': 2,
+                        'models_used': ['simple_strategy']
+                    }
+                else:
+                    return {
+                        'action': 2,
+                        'direction': 'HOLD',
+                        'confidence': 0.52,
+                        'market_context': None,
+                        'buy_votes': 0,
+                        'total_votes': 2,
+                        'models_used': ['simple_strategy']
+                    }
         except:
             return {
                 'action': 2,
@@ -1113,6 +1172,9 @@ def predict():
         confidence = prediction_result['confidence']
         market_context = prediction_result.get('market_context')
         
+        logger.info(f"   📊 Prediction: {action} with {confidence:.1%} confidence")
+        logger.info(f"   📊 Buy votes: {prediction_result.get('buy_votes', 0)}/{prediction_result.get('total_votes', 0)}")
+        
         # Determine signal with risk management
         current_price = float(df['close'].iloc[-1])
         
@@ -1157,6 +1219,12 @@ def predict():
                 action = 'NONE'
                 confidence = 0
         else:
+            logger.info(f"   ⚠️ No trade: action={action}, confidence={confidence:.1%}")
+            if action == 'HOLD':
+                logger.info(f"      Reason: Model voted HOLD")
+            elif confidence < 0.55:
+                logger.info(f"      Reason: Low confidence ({confidence:.1%} < 55%)")
+            
             action = 'NONE'
             sl_tp_info = {
                 'sl_price': current_price,
