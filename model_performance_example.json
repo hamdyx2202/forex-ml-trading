@@ -1,0 +1,38 @@
+{
+  "_comment": "مثال على ملف أداء النماذج - يتم تحديثه تلقائياً من النظام",
+  "EURUSD_M15_random_forest_enhanced": {
+    "accuracy": 0.68,
+    "win_rate": 62,
+    "profit_factor": 1.8,
+    "total_trades": 150,
+    "last_updated": "2025-08-19"
+  },
+  "EURUSD_M15_lightgbm_enhanced": {
+    "accuracy": 0.71,
+    "win_rate": 65,
+    "profit_factor": 2.1,
+    "total_trades": 150,
+    "last_updated": "2025-08-19"
+  },
+  "EURUSD_M15_xgboost_enhanced": {
+    "accuracy": 0.69,
+    "win_rate": 63,
+    "profit_factor": 1.9,
+    "total_trades": 150,
+    "last_updated": "2025-08-19"
+  },
+  "GBPUSD_M15_random_forest_enhanced": {
+    "accuracy": 0.66,
+    "win_rate": 60,
+    "profit_factor": 1.6,
+    "total_trades": 120,
+    "last_updated": "2025-08-19"
+  },
+  "GBPUSD_M15_neural_network_enhanced": {
+    "accuracy": 0.64,
+    "win_rate": 58,
+    "profit_factor": 1.4,
+    "total_trades": 120,
+    "last_updated": "2025-08-19"
+  }
+}
