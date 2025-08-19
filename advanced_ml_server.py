@@ -210,14 +210,41 @@ class AdvancedMLSystem:
         try:
             logger.info(f"🤖 Training {symbol} {timeframe} with all models...")
             
-            # Load data
+            # Load data - try different symbol variations
             conn = sqlite3.connect(self.db_path)
-            query = f"""
-            SELECT * FROM price_data 
-            WHERE symbol = '{symbol}'
-            ORDER BY time DESC
-            LIMIT 10000
-            """
+            
+            # Try different symbol formats
+            possible_symbols = [
+                symbol,
+                f"{symbol}m",
+                f"{symbol}.ecn",
+                f"{symbol}_pro",
+                symbol.lower(),
+                f"{symbol.lower()}m"
+            ]
+            
+            df = None
+            for sym in possible_symbols:
+                query = f"""
+                SELECT * FROM price_data 
+                WHERE symbol = '{sym}' OR symbol LIKE '{sym}%'
+                ORDER BY time DESC
+                LIMIT 10000
+                """
+                df_temp = pd.read_sql_query(query, conn)
+                if not df_temp.empty:
+                    df = df_temp
+                    logger.info(f"Found data with symbol: {sym}")
+                    break
+            
+            if df is None or df.empty:
+                query = f"""
+                SELECT * FROM price_data 
+                WHERE symbol LIKE '%{symbol}%'
+                ORDER BY time DESC
+                LIMIT 10000
+                """
+                df = pd.read_sql_query(query, conn)
             df = pd.read_sql_query(query, conn)
             conn.close()
             
