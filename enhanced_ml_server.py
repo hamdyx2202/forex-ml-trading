@@ -419,12 +419,26 @@ class EnhancedMLTradingSystem:
             self.models[key] = models
             
             # Save to disk
-            for model_name, model in models.items():
-                model_path = os.path.join(self.models_dir, f"{symbol}_{timeframe}_{model_name}_enhanced.pkl")
-                joblib.dump(model, model_path)
+            logger.info(f"   💾 Saving {len(models)} models to disk...")
+            saved_count = 0
             
-            scaler_path = os.path.join(self.models_dir, f"{symbol}_{timeframe}_scaler_enhanced.pkl")
-            joblib.dump(scaler, scaler_path)
+            for model_name, model in models.items():
+                try:
+                    model_path = os.path.join(self.models_dir, f"{symbol}_{timeframe}_{model_name}_enhanced.pkl")
+                    joblib.dump(model, model_path)
+                    saved_count += 1
+                    logger.info(f"      ✅ Saved {model_name}")
+                except Exception as e:
+                    logger.error(f"      ❌ Failed to save {model_name}: {e}")
+            
+            try:
+                scaler_path = os.path.join(self.models_dir, f"{symbol}_{timeframe}_scaler_enhanced.pkl")
+                joblib.dump(scaler, scaler_path)
+                logger.info(f"      ✅ Saved scaler")
+            except Exception as e:
+                logger.error(f"      ❌ Failed to save scaler: {e}")
+            
+            logger.info(f"   ✅ Successfully saved {saved_count}/{len(models)} models for {symbol} {timeframe}!")
             
             # Calculate ensemble accuracy
             ensemble_preds = []
@@ -463,7 +477,7 @@ class EnhancedMLTradingSystem:
             
             # Log important market conditions
             if market_context['session']['is_news_time']:
-                logger.warning("   ⚠️ News time - increased risk")
+                logger.info("   📰 News time detected")
             
             if market_context['volatility']['volatility_level'] == 'VERY_HIGH':
                 logger.warning("   ⚠️ Very high volatility")
@@ -540,9 +554,9 @@ class EnhancedMLTradingSystem:
             elif session_quality == 'LOW':
                 confidence_multiplier *= 0.7
             
-            # News time adjustment
+            # News time adjustment - خفيف جداً
             if market_context['session']['is_news_time']:
-                confidence_multiplier *= 0.6
+                confidence_multiplier *= 0.9  # بدلاً من 0.6
             
             final_confidence = min(0.95, base_confidence * confidence_multiplier)
             
@@ -759,6 +773,140 @@ class EnhancedMLTradingSystem:
                 'models_used': []
             }
     
+    def train_and_save_from_candles(self, symbol, timeframe, candles):
+        """تدريب وحفظ النماذج من الشموع المستلمة"""
+        try:
+            logger.info(f"\n🤖 Auto-training started for {symbol} {timeframe}")
+            
+            # تحويل إلى DataFrame
+            df = pd.DataFrame(candles)
+            for col in ['open', 'high', 'low', 'close']:
+                df[col] = pd.to_numeric(df[col], errors='coerce')
+            df['time'] = pd.to_datetime(df['time'])
+            df.set_index('time', inplace=True)
+            df = df.sort_index()
+            
+            # حساب الميزات الأساسية
+            features = pd.DataFrame(index=df.index)
+            
+            # Returns and price movements
+            features['returns'] = df['close'].pct_change()
+            features['log_returns'] = np.log(df['close'] / df['close'].shift(1))
+            
+            # Moving averages
+            for period in [5, 10, 20, 50]:
+                features[f'sma_{period}'] = df['close'].rolling(period).mean()
+                features[f'ema_{period}'] = df['close'].ewm(span=period).mean()
+            
+            # RSI
+            delta = df['close'].diff()
+            gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+            loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+            rs = gain / loss
+            features['rsi'] = 100 - (100 / (1 + rs))
+            
+            # MACD
+            exp1 = df['close'].ewm(span=12).mean()
+            exp2 = df['close'].ewm(span=26).mean()
+            features['macd'] = exp1 - exp2
+            features['macd_signal'] = features['macd'].ewm(span=9).mean()
+            
+            # Bollinger Bands
+            sma = df['close'].rolling(20).mean()
+            std = df['close'].rolling(20).std()
+            features['bb_upper'] = sma + (std * 2)
+            features['bb_lower'] = sma - (std * 2)
+            features['bb_width'] = features['bb_upper'] - features['bb_lower']
+            
+            # Volume features
+            features['volume_sma'] = df['volume'].rolling(20).mean()
+            features['volume_ratio'] = df['volume'] / features['volume_sma'].replace(0, 1)
+            
+            # Target (التنبؤ بالحركة التالية)
+            features['target'] = (df['close'].shift(-1) > df['close']).astype(int)
+            
+            # حذف NaN
+            features = features.dropna()
+            
+            if len(features) < 100:
+                logger.warning(f"Not enough data after feature calculation: {len(features)}")
+                return
+            
+            # تحضير البيانات للتدريب
+            X = features.drop('target', axis=1).values
+            y = features['target'].values
+            
+            # تقسيم البيانات
+            split_idx = int(len(X) * 0.8)
+            X_train, X_test = X[:split_idx], X[split_idx:]
+            y_train, y_test = y[:split_idx], y[split_idx:]
+            
+            # Scaling
+            from sklearn.preprocessing import RobustScaler
+            scaler = RobustScaler()
+            X_train_scaled = scaler.fit_transform(X_train)
+            X_test_scaled = scaler.transform(X_test)
+            
+            # تدريب النماذج
+            models = {}
+            
+            # Random Forest
+            try:
+                rf = RandomForestClassifier(n_estimators=50, max_depth=10, random_state=42, n_jobs=-1)
+                rf.fit(X_train_scaled, y_train)
+                accuracy = rf.score(X_test_scaled, y_test)
+                models['random_forest'] = rf
+                logger.info(f"   ✅ Random Forest: {accuracy:.2%}")
+            except Exception as e:
+                logger.error(f"   ❌ Random Forest failed: {e}")
+            
+            # Gradient Boosting
+            try:
+                gb = GradientBoostingClassifier(n_estimators=50, max_depth=5, random_state=42)
+                gb.fit(X_train_scaled, y_train)
+                accuracy = gb.score(X_test_scaled, y_test)
+                models['gradient_boosting'] = gb
+                logger.info(f"   ✅ Gradient Boosting: {accuracy:.2%}")
+            except Exception as e:
+                logger.error(f"   ❌ Gradient Boosting failed: {e}")
+            
+            # Extra Trees
+            try:
+                et = ExtraTreesClassifier(n_estimators=50, max_depth=10, random_state=42, n_jobs=-1)
+                et.fit(X_train_scaled, y_train)
+                accuracy = et.score(X_test_scaled, y_test)
+                models['extra_trees'] = et
+                logger.info(f"   ✅ Extra Trees: {accuracy:.2%}")
+            except Exception as e:
+                logger.error(f"   ❌ Extra Trees failed: {e}")
+            
+            # حفظ النماذج
+            if models:
+                model_key = f"{symbol}_{timeframe}"
+                self.models[model_key] = models
+                self.scalers[model_key] = scaler
+                
+                # حفظ على القرص
+                logger.info(f"   💾 Saving {len(models)} models to disk...")
+                for model_name, model in models.items():
+                    model_path = os.path.join(self.models_dir, f"{symbol}_{timeframe}_{model_name}_enhanced.pkl")
+                    joblib.dump(model, model_path)
+                    logger.info(f"      ✅ Saved {model_name}")
+                
+                # حفظ Scaler
+                scaler_path = os.path.join(self.models_dir, f"{symbol}_{timeframe}_scaler_enhanced.pkl")
+                joblib.dump(scaler, scaler_path)
+                logger.info(f"      ✅ Saved scaler")
+                
+                logger.info(f"   ✅ Auto-training completed! {len(models)} models saved for {symbol} {timeframe}")
+            else:
+                logger.error(f"   ❌ No models were trained successfully")
+                
+        except Exception as e:
+            logger.error(f"Auto-training failed: {e}")
+            import traceback
+            traceback.print_exc()
+    
     def load_existing_models(self):
         """Load pre-trained enhanced models"""
         if not os.path.exists(self.models_dir):
@@ -869,6 +1017,32 @@ def predict():
         # Update risk manager balance if provided
         if account_info.get('balance'):
             system.risk_manager.update_balance(account_info['balance'])
+        
+        # تدريب تلقائي وحفظ النماذج كل 100 طلب أو إذا لم توجد نماذج
+        model_key = f"{clean_symbol}_{timeframe}"
+        
+        # عداد الطلبات للتدريب الدوري
+        if not hasattr(system, 'request_counter'):
+            system.request_counter = {}
+        
+        if model_key not in system.request_counter:
+            system.request_counter[model_key] = 0
+        
+        system.request_counter[model_key] += 1
+        
+        # تدريب إذا: لا توجد نماذج، أو كل 100 طلب
+        should_train = (model_key not in system.models) or (system.request_counter[model_key] % 100 == 0)
+        
+        if should_train and len(candles) >= 500:
+            logger.info(f"   🤖 Auto-training triggered for {clean_symbol} {timeframe}")
+            
+            # تدريب في خيط منفصل لعدم تأخير الاستجابة
+            train_thread = threading.Thread(
+                target=system.train_and_save_from_candles,
+                args=(clean_symbol, timeframe, candles)
+            )
+            train_thread.daemon = True
+            train_thread.start()
         
         if len(candles) < 200:
             return jsonify({
