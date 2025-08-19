@@ -3,6 +3,7 @@
 🧹 Maintenance Script - سكريبت الصيانة الدورية
 📊 ينظف البيانات القديمة والنماذج غير المستخدمة
 💾 يحافظ على أداء النظام وتوفير المساحة
+🗄️ يستخدم نظام النسخ الاحتياطية الذكي
 """
 
 import os
@@ -11,6 +12,7 @@ import json
 import shutil
 from datetime import datetime, timedelta
 import logging
+from smart_backup_manager import SmartBackupManager
 
 # Setup logging
 logging.basicConfig(
@@ -44,6 +46,9 @@ class SystemMaintenance:
         # إنشاء مجلد النسخ الاحتياطية
         os.makedirs(self.backup_dir, exist_ok=True)
         
+        # مدير النسخ الاحتياطية الذكي
+        self.backup_manager = SmartBackupManager()
+        
     def run_full_maintenance(self):
         """تشغيل الصيانة الكاملة"""
         logger.info("="*70)
@@ -71,20 +76,21 @@ class SystemMaintenance:
         logger.info("✅ Maintenance completed successfully!")
         
     def backup_database(self):
-        """نسخ احتياطي لقاعدة البيانات"""
+        """نسخ احتياطي ذكي لقاعدة البيانات"""
         try:
             if not os.path.exists(self.db_path):
                 logger.warning("Database not found, skipping backup")
                 return
-                
-            backup_name = f"forex_ml_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
-            backup_path = os.path.join(self.backup_dir, backup_name)
             
-            shutil.copy2(self.db_path, backup_path)
-            logger.info(f"✅ Database backed up to: {backup_path}")
+            logger.info("📦 Creating smart backup...")
             
-            # حذف النسخ الاحتياطية القديمة (أكثر من 7 أيام)
-            self._cleanup_old_backups()
+            # استخدام مدير النسخ الاحتياطية الذكي
+            backup_path = self.backup_manager.smart_backup(self.db_path)
+            
+            if backup_path:
+                logger.info(f"✅ Smart backup created successfully")
+            else:
+                logger.info("📊 No backup needed (no changes detected)")
             
         except Exception as e:
             logger.error(f"❌ Backup failed: {e}")
@@ -359,19 +365,9 @@ class SystemMaintenance:
             logger.error(f"❌ Database optimization failed: {e}")
             
     def _cleanup_old_backups(self):
-        """حذف النسخ الاحتياطية القديمة"""
-        try:
-            for file in os.listdir(self.backup_dir):
-                if file.startswith('forex_ml_backup_'):
-                    file_path = os.path.join(self.backup_dir, file)
-                    file_age = datetime.now() - datetime.fromtimestamp(os.path.getmtime(file_path))
-                    
-                    if file_age.days > 7:
-                        os.remove(file_path)
-                        logger.info(f"   ✅ Deleted old backup: {file}")
-                        
-        except Exception as e:
-            logger.error(f"❌ Backup cleanup failed: {e}")
+        """حذف النسخ الاحتياطية القديمة - لم تعد مطلوبة مع النظام الذكي"""
+        # هذه الدالة لم تعد مطلوبة لأن SmartBackupManager يتولى التنظيف الذكي
+        pass
             
     def generate_maintenance_report(self):
         """توليد تقرير الصيانة"""
@@ -495,6 +491,16 @@ def main():
     else:
         # تشغيل الصيانة الكاملة
         maintenance.run_full_maintenance()
+        
+        # عرض معلومات النسخ الاحتياطية
+        logger.info("\n📦 Backup Information:")
+        backups = maintenance.backup_manager.list_backups()
+        logger.info(f"   Total backups: {len(backups)}")
+        if backups:
+            total_size = sum(b['size_mb'] for b in backups)
+            logger.info(f"   Total backup size: {total_size:.1f} MB")
+            logger.info(f"   Oldest backup: {backups[-1]['age_days']} days old")
+            logger.info(f"   Newest backup: {backups[0]['age_days']} days old")
 
 if __name__ == "__main__":
     main()

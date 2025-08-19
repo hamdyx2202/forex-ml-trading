@@ -62,7 +62,9 @@ class EnhancedMLTradingSystem:
     def __init__(self):
         self.models = {}
         self.scalers = {}
-        self.db_path = './data/forex_ml.db'
+        # استخدام القاعدة الرئيسية الكبيرة
+        self.db_path = './data/forex_ml.db'  # 910 MB - القاعدة الرئيسية
+        # القاعدة الثانوية للاختبار: './data/forex_data.db'
         self.models_dir = './trained_models'
         
         os.makedirs(self.models_dir, exist_ok=True)
