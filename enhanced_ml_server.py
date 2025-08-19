@@ -93,10 +93,18 @@ class EnhancedMLTradingSystem:
         # Load existing models
         self.load_existing_models()
         
+        # عد النماذج
+        total_models = sum(len(models) for models in self.models.values())
+        enhanced_models = sum(1 for key, models in self.models.items() 
+                            for model_name in models.keys() 
+                            if any(m in model_name for m in ['neural', 'lightgbm', 'xgboost']))
+        
         logger.info(f"✅ Enhanced ML Trading System initialized")
         logger.info(f"   📊 Market Analyzer: Ready")
         logger.info(f"   💰 Risk Manager: Balance ${self.risk_manager.current_balance}")
-        logger.info(f"   🤖 ML Models: {len(self.models)} loaded")
+        logger.info(f"   🤖 ML Models: {total_models} loaded ({len(self.models)} pairs)")
+        if enhanced_models > 0:
+            logger.info(f"   💪 Using advanced models (6-model ensemble)")
     
     def calculate_enhanced_features(self, df, market_context=None):
         """حساب الميزات المحسنة مع سياق السوق"""
@@ -886,17 +894,18 @@ class EnhancedMLTradingSystem:
                 self.models[model_key] = models
                 self.scalers[model_key] = scaler
                 
-                # حفظ على القرص
-                logger.info(f"   💾 Saving {len(models)} models to disk...")
+                # حفظ على القرص بأسماء مختلفة لتجنب الكتابة فوق النماذج القوية
+                logger.info(f"   💾 Saving {len(models)} auto-trained models...")
                 for model_name, model in models.items():
-                    model_path = os.path.join(self.models_dir, f"{symbol}_{timeframe}_{model_name}_enhanced.pkl")
+                    # حفظ بـ _auto بدلاً من _enhanced
+                    model_path = os.path.join(self.models_dir, f"{symbol}_{timeframe}_{model_name}_auto.pkl")
                     joblib.dump(model, model_path)
-                    logger.info(f"      ✅ Saved {model_name}")
+                    logger.info(f"      ✅ Saved {model_name} (auto-trained)")
                 
                 # حفظ Scaler
-                scaler_path = os.path.join(self.models_dir, f"{symbol}_{timeframe}_scaler_enhanced.pkl")
+                scaler_path = os.path.join(self.models_dir, f"{symbol}_{timeframe}_scaler_auto.pkl")
                 joblib.dump(scaler, scaler_path)
-                logger.info(f"      ✅ Saved scaler")
+                logger.info(f"      ✅ Saved scaler (auto-trained)")
                 
                 logger.info(f"   ✅ Auto-training completed! {len(models)} models saved for {symbol} {timeframe}")
             else:
@@ -908,12 +917,14 @@ class EnhancedMLTradingSystem:
             traceback.print_exc()
     
     def load_existing_models(self):
-        """Load pre-trained enhanced models"""
+        """Load pre-trained models - يفضل النماذج القوية (enhanced) على الضعيفة (auto)"""
         if not os.path.exists(self.models_dir):
             return
         
+        # أولاً: حمل النماذج القوية (6 نماذج من التدريب الكامل)
+        enhanced_count = 0
         for file in os.listdir(self.models_dir):
-            if file.endswith('_enhanced.pkl'):
+            if file.endswith('_enhanced.pkl') and 'scaler' not in file:
                 try:
                     parts = file.replace('.pkl', '').split('_')
                     if len(parts) >= 4:
@@ -927,11 +938,38 @@ class EnhancedMLTradingSystem:
                         
                         model = joblib.load(os.path.join(self.models_dir, file))
                         self.models[key][model_type] = model
+                        enhanced_count += 1
                         
                 except Exception as e:
                     logger.error(f"Error loading {file}: {e}")
-            
-            elif file.endswith('_scaler_enhanced.pkl'):
+        
+        # ثانياً: حمل النماذج التلقائية فقط إذا لم توجد نماذج قوية
+        auto_count = 0
+        for file in os.listdir(self.models_dir):
+            if file.endswith('_auto.pkl') and 'scaler' not in file:
+                try:
+                    parts = file.replace('.pkl', '').split('_')
+                    if len(parts) >= 4:
+                        symbol = parts[0]
+                        timeframe = parts[1]
+                        model_type = '_'.join(parts[2:-1])
+                        
+                        key = f"{symbol}_{timeframe}"
+                        # حمل النموذج التلقائي فقط إذا لم يوجد نموذج قوي
+                        if key not in self.models:
+                            self.models[key] = {}
+                        
+                        if model_type not in self.models[key]:
+                            model = joblib.load(os.path.join(self.models_dir, file))
+                            self.models[key][model_type] = model
+                            auto_count += 1
+                        
+                except Exception as e:
+                    logger.error(f"Error loading {file}: {e}")
+        
+        # حمل Scalers (يفضل enhanced على auto)
+        for file in os.listdir(self.models_dir):
+            if file.endswith('_scaler_enhanced.pkl'):
                 try:
                     parts = file.replace('.pkl', '').split('_')
                     if len(parts) >= 3:
