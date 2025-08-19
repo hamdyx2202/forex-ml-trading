@@ -11,6 +11,13 @@ import time
 import sqlite3
 import pandas as pd
 import logging
+import warnings
+
+# إخفاء تحذيرات الأداء المزعجة
+warnings.filterwarnings('ignore', category=pd.errors.PerformanceWarning)
+warnings.filterwarnings('ignore', message='DataFrame is highly fragmented')
+warnings.filterwarnings('ignore', message='DataFrame.interpolate with method=pad')
+os.environ['PYTHONWARNINGS'] = 'ignore'
 
 # إضافة مسار السيرفر
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))

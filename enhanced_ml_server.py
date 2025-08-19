@@ -14,9 +14,14 @@ import sqlite3
 import joblib
 import numpy as np
 import pandas as pd
+import warnings
 from datetime import datetime, timedelta
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+
+# إخفاء تحذيرات الأداء
+warnings.filterwarnings('ignore', category=pd.errors.PerformanceWarning)
+warnings.filterwarnings('ignore', message='DataFrame is highly fragmented')
 
 # ML Libraries
 from sklearn.preprocessing import RobustScaler
