@@ -245,10 +245,10 @@ class AdvancedMLSystem:
                 LIMIT 10000
                 """
                 df = pd.read_sql_query(query, conn)
-            df = pd.read_sql_query(query, conn)
+            
             conn.close()
             
-            if len(df) < 1000:
+            if df is None or len(df) < 1000:
                 logger.warning(f"Not enough data for {symbol}")
                 return False
             
@@ -268,10 +268,25 @@ class AdvancedMLSystem:
                 return False
             
             # Prepare training data
-            X = features.values
-            y = (df['close'].shift(-1) > df['close']).astype(int)
-            y = y.loc[features.index].values[:-1]
-            X = X[:-1]
+            # Ensure df and features have the same index
+            common_index = features.index.intersection(df.index)
+            features_aligned = features.loc[common_index]
+            df_aligned = df.loc[common_index]
+            
+            # Create target variable
+            y = (df_aligned['close'].shift(-1) > df_aligned['close']).astype(int)
+            
+            # Remove last row (NaN from shift)
+            X = features_aligned.values[:-1]
+            y = y.values[:-1]
+            
+            # Final check
+            if len(X) != len(y):
+                logger.error(f"Shape mismatch: X={len(X)}, y={len(y)}")
+                # Use minimum length
+                min_len = min(len(X), len(y))
+                X = X[:min_len]
+                y = y[:min_len]
             
             # Split data
             X_train, X_test, y_train, y_test = train_test_split(
