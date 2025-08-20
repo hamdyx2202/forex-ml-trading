@@ -401,6 +401,147 @@ class EnhancedMLTradingSystem:
                 
                 self.performance_tracker['model_weights'][key] = weights
     
+    def learn_from_trade_result(self, trade_info):
+        """تعلم فوري من نتيجة كل صفقة"""
+        
+        symbol = trade_info['symbol']
+        timeframe = trade_info.get('timeframe', 'M15')
+        key = f"{symbol}_{timeframe}"
+        
+        # تحديث سجل أداء النماذج
+        if key not in self.performance_tracker['model_performance']:
+            self.performance_tracker['model_performance'][key] = {}
+        
+        # سجل أداء كل نموذج شارك في القرار
+        models_used = trade_info.get('models_used', [])
+        profit = trade_info.get('profit', 0)
+        
+        for model_name in models_used:
+            if model_name not in self.performance_tracker['model_performance'][key]:
+                self.performance_tracker['model_performance'][key][model_name] = {
+                    'total_trades': 0,
+                    'winning_trades': 0,
+                    'total_profit': 0,
+                    'recent_performance': []  # آخر 50 صفقة
+                }
+            
+            stats = self.performance_tracker['model_performance'][key][model_name]
+            stats['total_trades'] += 1
+            if profit > 0:
+                stats['winning_trades'] += 1
+            stats['total_profit'] += profit
+            
+            # احتفظ بآخر 50 نتيجة
+            stats['recent_performance'].append(profit)
+            if len(stats['recent_performance']) > 50:
+                stats['recent_performance'].pop(0)
+        
+        # تحديث الأوزان فوراً بعد كل صفقة
+        self.update_model_weights_immediately(key)
+        
+        # إذا كانت خسارة كبيرة، سجل الظروف لتجنبها
+        if profit < -50:  # خسارة أكثر من 50$
+            self.record_failure_pattern(trade_info)
+    
+    def update_model_weights_immediately(self, key):
+        """تحديث فوري لأوزان النماذج بناءً على الأداء الأخير"""
+        
+        if key not in self.performance_tracker['model_performance']:
+            return
+        
+        weights = {}
+        for model_name, stats in self.performance_tracker['model_performance'][key].items():
+            # حساب الوزن بناءً على آخر 50 صفقة
+            recent = stats.get('recent_performance', [])
+            if recent:
+                avg_profit = np.mean(recent)
+                win_rate = sum(1 for p in recent if p > 0) / len(recent)
+                
+                # وزن مركب من الربح ونسبة النجاح
+                if avg_profit > 20 and win_rate > 0.6:
+                    weight = 2.0  # نموذج ممتاز
+                elif avg_profit > 0 and win_rate > 0.5:
+                    weight = 1.5  # نموذج جيد
+                elif avg_profit > -10:
+                    weight = 1.0  # نموذج متوسط
+                else:
+                    weight = 0.3  # نموذج ضعيف (لكن لا نلغيه تماماً)
+            else:
+                weight = 0.8  # وزن افتراضي للنماذج الجديدة
+            
+            weights[model_name] = weight
+        
+        # حفظ الأوزان المحدثة
+        if 'model_weights' not in self.performance_tracker:
+            self.performance_tracker['model_weights'] = {}
+        self.performance_tracker['model_weights'][key] = weights
+    
+    def select_best_models_for_prediction(self, key):
+        """اختيار أفضل النماذج للتنبؤ بناءً على الأداء"""
+        
+        if key not in self.models:
+            return None
+        
+        all_models = self.models[key]
+        
+        # إذا لم توجد بيانات أداء، استخدم كل النماذج
+        if key not in self.performance_tracker['model_performance']:
+            return all_models
+        
+        # رتب النماذج حسب الأداء
+        model_rankings = []
+        for model_name, model in all_models.items():
+            stats = self.performance_tracker['model_performance'][key].get(model_name, {})
+            
+            # حساب score مركب
+            total_profit = stats.get('total_profit', 0)
+            win_rate = stats['winning_trades'] / stats['total_trades'] if stats.get('total_trades', 0) > 0 else 0.5
+            recent_avg = np.mean(stats.get('recent_performance', [0]))
+            
+            score = (total_profit * 0.3) + (win_rate * 100 * 0.4) + (recent_avg * 0.3)
+            model_rankings.append((model_name, model, score))
+        
+        # رتب من الأفضل للأسوأ
+        model_rankings.sort(key=lambda x: x[2], reverse=True)
+        
+        # اختر النماذج حسب الأداء
+        selected_models = {}
+        
+        # دائماً استخدم أفضل 3 نماذج على الأقل
+        for i, (name, model, score) in enumerate(model_rankings):
+            if i < 3 or score > 0:  # أفضل 3 أو أي نموذج بـ score إيجابي
+                selected_models[name] = model
+        
+        # إذا لم نجد نماذج مربحة، استخدم أفضل 2 على الأقل
+        if len(selected_models) == 0 and len(model_rankings) > 0:
+            for i in range(min(2, len(model_rankings))):
+                name, model, _ = model_rankings[i]
+                selected_models[name] = model
+        
+        return selected_models if selected_models else all_models
+    
+    def record_failure_pattern(self, trade_info):
+        """حفظ ظروف الصفقات الخاسرة لتجنبها"""
+        
+        if 'failure_patterns' not in self.performance_tracker:
+            self.performance_tracker['failure_patterns'] = []
+        
+        pattern = {
+            'timestamp': datetime.now(),
+            'symbol': trade_info['symbol'],
+            'market_score': trade_info.get('market_score'),
+            'confidence': trade_info.get('confidence'),
+            'volatility': trade_info.get('volatility'),
+            'loss_amount': trade_info['profit'],
+            'entry_reason': trade_info.get('entry_reason')
+        }
+        
+        self.performance_tracker['failure_patterns'].append(pattern)
+        
+        # احتفظ بآخر 100 نمط فشل
+        if len(self.performance_tracker['failure_patterns']) > 100:
+            self.performance_tracker['failure_patterns'].pop(0)
+    
     def predict_with_weighted_ensemble(self, symbol, timeframe, df):
         """التنبؤ مع تصويت مرجح بناءً على أداء النماذج"""
         try:
@@ -467,10 +608,14 @@ class EnhancedMLTradingSystem:
             weights = []
             model_names = []
             
+            # اختر أفضل النماذج بناءً على الأداء
+            selected_models = self.select_best_models_for_prediction(key)
+            logger.info(f"   📊 Using {len(selected_models)} models based on performance")
+            
             # الحصول على أوزان النماذج
             model_weights = self.performance_tracker.get('model_weights', {}).get(key, {})
             
-            for model_name, model in self.models[key].items():
+            for model_name, model in selected_models.items():
                 try:
                     pred = model.predict(X_scaled)[0]
                     prob = model.predict_proba(X_scaled)[0]
@@ -1581,6 +1726,11 @@ class EnhancedMLTradingSystem:
             # Track performance
             self.performance_tracker['trades'].append(trade_info)
             
+            # تعلم فوري من النتيجة
+            if trade_info['status'] == 'closed' and trade_info.get('profit') is not None:
+                self.learn_from_trade_result(trade_info)
+                logger.info(f"   🧠 Learned from trade result: {'WIN' if trade_info['profit'] > 0 else 'LOSS'} ${trade_info['profit']:.2f}")
+            
             # Log the update
             logger.info(f"📊 Trade update: {trade_info['symbol']} - {trade_info['status']}")
             
@@ -1652,8 +1802,8 @@ def predict():
         
         system.request_counter[model_key] += 1
         
-        # تدريب إذا: لا توجد نماذج، أو كل 100 طلب
-        should_train = (model_key not in system.models) or (system.request_counter[model_key] % 100 == 0)
+        # تدريب إذا: لا توجد نماذج، أو كل 50 طلب
+        should_train = (model_key not in system.models) or (system.request_counter[model_key] % 50 == 0)
         
         if should_train and len(candles) >= 500:
             logger.info(f"   🤖 Auto-training triggered for {clean_symbol} {timeframe}")
