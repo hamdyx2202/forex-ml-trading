@@ -10,6 +10,17 @@
 #include <Trade\Trade.mqh>
 #include <Trade\PositionInfo.mqh>
 
+// تعريف أكواد الأخطاء الشائعة
+#define RETCODE_REQUOTE              10004
+#define RETCODE_REJECT               10006
+#define RETCODE_TIMEOUT              10012
+#define RETCODE_TIMEOUT_EXPIRED      10013
+#define RETCODE_INVALID_STOPS        10016
+#define RETCODE_MARKET_CLOSED        10018
+#define RETCODE_NO_MONEY            10019
+#define RETCODE_NO_REPLY            10020
+#define RETCODE_TOO_FREQUENT        10021
+
 // إعدادات الإدخال
 input string   ServerURL = "http://69.62.121.53:5000";     // رابط السيرفر
 input bool     UseRemoteServer = true;                     // استخدام السيرفر البعيد
@@ -627,15 +638,20 @@ bool OpenTradeWithRetry(string symbol, ENUM_ORDER_TYPE orderType, double lotSize
         else
         {
             int error = GetLastError();
-            string retcode = trade.ResultRetcodeDescription();
-            Print("❌ فشل فتح الصفقة - المحاولة ", attempt, "/", MaxRetries);
-            Print("   Error: ", error, " - ", retcode);
-            Print("   Retcode: ", trade.ResultRetcode());
+            uint retcode = trade.ResultRetcode();
+            string retcodeDesc = trade.ResultRetcodeDescription();
             
-            // معالجة أخطاء محددة
-            if(error == TRADE_RETCODE_TIMEOUT || 
-               error == TRADE_RETCODE_NO_REPLY ||
-               trade.ResultRetcode() == 10004)  // Requote
+            Print("❌ فشل فتح الصفقة - المحاولة ", attempt, "/", MaxRetries);
+            Print("   Error: ", error);
+            Print("   Retcode: ", retcode, " - ", retcodeDesc);
+            
+            // أكواد الأخطاء الشائعة
+            if(retcode == RETCODE_REQUOTE ||
+               retcode == RETCODE_REJECT ||
+               retcode == RETCODE_TIMEOUT ||
+               retcode == RETCODE_TIMEOUT_EXPIRED ||
+               retcode == RETCODE_NO_REPLY ||
+               retcode == RETCODE_TOO_FREQUENT)
             {
                 if(attempt < MaxRetries)
                 {
@@ -644,14 +660,19 @@ bool OpenTradeWithRetry(string symbol, ENUM_ORDER_TYPE orderType, double lotSize
                     continue;
                 }
             }
-            else if(error == TRADE_RETCODE_MARKET_CLOSED)
+            else if(retcode == RETCODE_MARKET_CLOSED)
             {
                 Print("❌ السوق مغلق");
                 return false;
             }
-            else if(error == TRADE_RETCODE_NO_MONEY)
+            else if(retcode == RETCODE_NO_MONEY)
             {
                 Print("❌ رصيد غير كافي");
+                return false;
+            }
+            else if(retcode == RETCODE_INVALID_STOPS)
+            {
+                Print("❌ مستويات SL/TP غير صحيحة");
                 return false;
             }
             else
