@@ -23,6 +23,9 @@ input string   ManualPairs = "EURUSD,GBPUSD,USDJPY,USDCHF,AUDUSD,USDCAD,NZDUSD,E
 input string   Timeframes = "M5,M15,M30,H1,H4";           // الفريمات
 input bool     EnableLogging = true;                       // تفعيل السجلات
 input string   SymbolSuffix = "m";                         // لاحقة الرموز (m, .ecn, إلخ)
+input int      OrderTimeout = 30000;                       // Timeout للأوامر بالميلي ثانية
+input int      MaxRetries = 3;                             // عدد محاولات إعادة فتح الصفقة
+input int      RetryDelay = 2000;                          // التأخير بين المحاولات بالميلي ثانية
 
 // متغيرات عامة
 CTrade trade;
@@ -39,6 +42,12 @@ string detectedSuffix = "";
 //+------------------------------------------------------------------+
 int OnInit()
 {
+    // تهيئة إعدادات التداول
+    trade.SetExpertMagicNumber(123456);
+    trade.SetDeviationInPoints(20);  // زيادة الانحراف المسموح
+    trade.SetTypeFilling(ORDER_FILLING_IOC);
+    trade.SetAsyncMode(false);  // التداول المتزامن
+    
     // اكتشاف لاحقة الرموز
     detectedSuffix = DetectSymbolSuffix();
     Print("🔍 تم اكتشاف لاحقة الرموز: '", detectedSuffix, "'");
@@ -392,37 +401,31 @@ void ExecuteTrade(string symbol, string action, double sl, double tp1, double tp
         return;
     }
     
+    // فحص ظروف السوق
+    if(!IsGoodTimeToTrade(symbol))
+    {
+        Print("⚠️ ظروف السوق غير مناسبة للتداول: ", symbol);
+        return;
+    }
+    
     // حساب حجم الصفقة
     double lotSize = CalculateLotSize(symbol, sl);
     if(lotSize <= 0) return;
     
-    // فتح الصفقة
-    trade.SetExpertMagicNumber(123456);
-    trade.SetDeviationInPoints(10);
-    
+    // استخدام الدالة المحسنة مع إعادة المحاولة
+    bool result = false;
     if(action == "BUY")
     {
-        double ask = SymbolInfoDouble(symbol, SYMBOL_ASK);
-        if(trade.Buy(lotSize, symbol, ask, sl, tp1))
-        {
-            totalTrades++;
-            Print("✅ فتح صفقة شراء: ", symbol, 
-                  " Lot: ", DoubleToString(lotSize, 2),
-                  " SL: ", DoubleToString(sl, _Digits),
-                  " TP: ", DoubleToString(tp1, _Digits));
-        }
+        result = OpenTradeWithRetry(symbol, ORDER_TYPE_BUY, lotSize, sl, tp1, "ML Signal");
     }
     else if(action == "SELL")
     {
-        double bid = SymbolInfoDouble(symbol, SYMBOL_BID);
-        if(trade.Sell(lotSize, symbol, bid, sl, tp1))
-        {
-            totalTrades++;
-            Print("✅ فتح صفقة بيع: ", symbol, 
-                  " Lot: ", DoubleToString(lotSize, 2),
-                  " SL: ", DoubleToString(sl, _Digits),
-                  " TP: ", DoubleToString(tp1, _Digits));
-        }
+        result = OpenTradeWithRetry(symbol, ORDER_TYPE_SELL, lotSize, sl, tp1, "ML Signal");
+    }
+    
+    if(result)
+    {
+        totalTrades++;
     }
 }
 
@@ -553,5 +556,158 @@ bool CheckServerConnection()
     }
     
     return false;
+}
+
+//+------------------------------------------------------------------+
+//| فتح صفقة مع إعادة المحاولة                                       |
+//+------------------------------------------------------------------+
+bool OpenTradeWithRetry(string symbol, ENUM_ORDER_TYPE orderType, double lotSize, 
+                       double sl, double tp, string comment)
+{
+    for(int attempt = 1; attempt <= MaxRetries; attempt++)
+    {
+        // فحص الاتصال قبل المحاولة
+        if(!CheckTerminalConnection())
+        {
+            Print("⚠️ Terminal not connected, waiting...");
+            Sleep(RetryDelay);
+            continue;
+        }
+        
+        // تحديث الأسعار
+        MqlTick tick;
+        if(!SymbolInfoTick(symbol, tick))
+        {
+            Print("❌ Failed to get tick for ", symbol);
+            return false;
+        }
+        
+        // استخدام الأسعار الحالية
+        double price = (orderType == ORDER_TYPE_BUY) ? tick.ask : tick.bid;
+        
+        // إعادة حساب SL/TP بناءً على السعر الحالي
+        double slDistance = MathAbs(sl - price);
+        double tpDistance = MathAbs(tp - price);
+        
+        if(orderType == ORDER_TYPE_BUY)
+        {
+            sl = price - slDistance;
+            tp = price + tpDistance;
+        }
+        else
+        {
+            sl = price + slDistance;
+            tp = price - tpDistance;
+        }
+        
+        // فتح الصفقة
+        bool result = false;
+        ResetLastError();
+        
+        if(orderType == ORDER_TYPE_BUY)
+        {
+            result = trade.Buy(lotSize, symbol, price, sl, tp, comment);
+        }
+        else
+        {
+            result = trade.Sell(lotSize, symbol, price, sl, tp, comment);
+        }
+        
+        if(result)
+        {
+            string orderTypeStr = (orderType == ORDER_TYPE_BUY) ? "شراء" : "بيع";
+            Print("✅ فتح صفقة ", orderTypeStr, " بنجاح: ", symbol, 
+                  " المحاولة: ", attempt,
+                  " Lot: ", DoubleToString(lotSize, 2),
+                  " Price: ", DoubleToString(price, _Digits),
+                  " SL: ", DoubleToString(sl, _Digits),
+                  " TP: ", DoubleToString(tp, _Digits));
+            return true;
+        }
+        else
+        {
+            int error = GetLastError();
+            string retcode = trade.ResultRetcodeDescription();
+            Print("❌ فشل فتح الصفقة - المحاولة ", attempt, "/", MaxRetries);
+            Print("   Error: ", error, " - ", retcode);
+            Print("   Retcode: ", trade.ResultRetcode());
+            
+            // معالجة أخطاء محددة
+            if(error == TRADE_RETCODE_TIMEOUT || 
+               error == TRADE_RETCODE_NO_REPLY ||
+               trade.ResultRetcode() == 10004)  // Requote
+            {
+                if(attempt < MaxRetries)
+                {
+                    Print("⏳ إعادة المحاولة بعد ", RetryDelay/1000, " ثانية...");
+                    Sleep(RetryDelay);
+                    continue;
+                }
+            }
+            else if(error == TRADE_RETCODE_MARKET_CLOSED)
+            {
+                Print("❌ السوق مغلق");
+                return false;
+            }
+            else if(error == TRADE_RETCODE_NO_MONEY)
+            {
+                Print("❌ رصيد غير كافي");
+                return false;
+            }
+            else
+            {
+                // خطأ آخر - لا نعيد المحاولة
+                break;
+            }
+        }
+    }
+    
+    Print("❌ فشل فتح الصفقة بعد ", MaxRetries, " محاولات");
+    return false;
+}
+
+//+------------------------------------------------------------------+
+//| فحص اتصال المنصة                                                |
+//+------------------------------------------------------------------+
+bool CheckTerminalConnection()
+{
+    if(!TerminalInfoInteger(TERMINAL_CONNECTED))
+    {
+        return false;
+    }
+    
+    if(!AccountInfoInteger(ACCOUNT_TRADE_ALLOWED))
+    {
+        Print("❌ Trading not allowed on this account!");
+        return false;
+    }
+    
+    return true;
+}
+
+//+------------------------------------------------------------------+
+//| فحص ظروف السوق قبل التداول                                     |
+//+------------------------------------------------------------------+
+bool IsGoodTimeToTrade(string symbol)
+{
+    // فحص السبريد
+    double spread = SymbolInfoInteger(symbol, SYMBOL_SPREAD);
+    double avgSpread = 20; // متوسط السبريد المقبول بالنقاط
+    
+    if(spread > avgSpread * 3)
+    {
+        Print("⚠️ Spread too high for ", symbol, ": ", spread, " points");
+        return false;
+    }
+    
+    // فحص السوق مفتوح
+    ENUM_SYMBOL_TRADE_MODE tradeMode = (ENUM_SYMBOL_TRADE_MODE)SymbolInfoInteger(symbol, SYMBOL_TRADE_MODE);
+    if(tradeMode == SYMBOL_TRADE_MODE_DISABLED || tradeMode == SYMBOL_TRADE_MODE_CLOSEONLY)
+    {
+        Print("⚠️ Trading disabled for ", symbol);
+        return false;
+    }
+    
+    return true;
 }
 //+------------------------------------------------------------------+
