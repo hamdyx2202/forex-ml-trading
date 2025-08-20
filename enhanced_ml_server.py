@@ -15,6 +15,7 @@ import joblib
 import numpy as np
 import pandas as pd
 import warnings
+import time
 from datetime import datetime, timedelta
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -160,8 +161,11 @@ class EnhancedMLTradingSystem:
         
         # Ensure all values are scalar (not arrays or lists)
         for col in features.columns:
-            if isinstance(features[col].iloc[-1], (list, np.ndarray)):
-                features[col] = features[col].apply(lambda x: x[0] if isinstance(x, (list, np.ndarray)) and len(x) > 0 else 0)
+            try:
+                if len(features) > 0 and isinstance(features[col].iloc[-1], (list, np.ndarray)):
+                    features[col] = features[col].apply(lambda x: x[0] if isinstance(x, (list, np.ndarray)) and len(x) > 0 else 0)
+            except IndexError:
+                continue
         
         return features
     
@@ -496,10 +500,16 @@ class EnhancedMLTradingSystem:
     def predict_with_context(self, symbol, timeframe, df):
         """التنبؤ مع تحليل السياق الكامل"""
         try:
-            # 1. Analyze market context
+            # 1. Analyze market context - with timeout protection
+            start_time = time.time()
             market_context = self.market_analyzer.analyze_complete_market_context(
                 symbol, df.reset_index().to_dict('records'), timeframe
             )
+            
+            # Check if analysis took too long
+            if time.time() - start_time > 5:  # 5 seconds max for analysis
+                logger.warning(f"Market analysis took too long: {time.time() - start_time:.1f}s")
+                return self._simple_prediction(df)
             
             if not market_context:
                 logger.warning("Failed to analyze market context")
@@ -795,6 +805,18 @@ class EnhancedMLTradingSystem:
     def _simple_prediction(self, df):
         """Simple fallback prediction - استراتيجية بسيطة نشطة"""
         try:
+            # التحقق من وجود بيانات كافية
+            if len(df) < 20:
+                return {
+                    'action': 2,
+                    'direction': 'HOLD',
+                    'confidence': 0.0,
+                    'market_context': None,
+                    'buy_votes': 0,
+                    'total_votes': 0,
+                    'models_used': ['insufficient_data']
+                }
+            
             latest = df.iloc[-1]
             close = latest['close']
             

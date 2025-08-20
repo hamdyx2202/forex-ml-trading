@@ -356,7 +356,7 @@ string SendToServer(string jsonData)
     ArrayResize(post, ArraySize(post) - 1);
     
     ResetLastError();
-    int res = WebRequest("POST", ServerURL + "/predict", headers, 5000, post, result, headers);
+    int res = WebRequest("POST", ServerURL + "/predict", headers, 30000, post, result, headers);
     
     if(res == -1)
     {
