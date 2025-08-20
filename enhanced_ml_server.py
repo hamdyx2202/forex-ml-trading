@@ -16,7 +16,10 @@ import numpy as np
 import pandas as pd
 import warnings
 import time
+import hashlib
+import gc
 from datetime import datetime, timedelta
+from functools import lru_cache
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 
@@ -93,6 +96,10 @@ class EnhancedMLTradingSystem:
             'daily_stats': {},
             'model_performance': {}  # أداء كل نموذج
         }
+        
+        # Cache for analysis results
+        self.analysis_cache = {}
+        self.cache_expiry = 30  # ثانية
         
         # Feature selectors
         self.feature_selectors = {}
@@ -542,18 +549,47 @@ class EnhancedMLTradingSystem:
         if len(self.performance_tracker['failure_patterns']) > 100:
             self.performance_tracker['failure_patterns'].pop(0)
     
+    def get_cached_analysis(self, symbol, timeframe, candles_hash):
+        """Cache market analysis for 30 seconds"""
+        cache_key = f"{symbol}_{timeframe}_{candles_hash}"
+        
+        if cache_key in self.analysis_cache:
+            cached_data, timestamp = self.analysis_cache[cache_key]
+            if datetime.now() - timestamp < timedelta(seconds=self.cache_expiry):
+                logger.info("   ⚡ Using cached analysis")
+                return cached_data
+        
+        return None
+    
     def predict_with_weighted_ensemble(self, symbol, timeframe, df):
         """التنبؤ مع تصويت مرجح بناءً على أداء النماذج"""
         try:
-            # تحليل السوق
-            start_time = time.time()
-            market_context = self.market_analyzer.analyze_complete_market_context(
-                symbol, df.reset_index().to_dict('records'), timeframe
-            )
+            # استخدم آخر 100 شمعة فقط للتحليل السريع
+            df_analysis = df.tail(100)  # بدلاً من df الكاملة
             
-            if time.time() - start_time > 5:
-                logger.warning(f"Market analysis took too long: {time.time() - start_time:.1f}s")
-                return self._simple_prediction(df)
+            # احسب hash للـ cache
+            candles_hash = hashlib.md5(str(df_analysis.values[-10:]).encode()).hexdigest()
+            
+            # تحقق من cache أولاً
+            cached = self.get_cached_analysis(symbol, timeframe, candles_hash)
+            if cached:
+                market_context = cached
+            else:
+                # تحليل السوق
+                start_time = time.time()
+                market_context = self.market_analyzer.analyze_complete_market_context(
+                    symbol, df_analysis.reset_index().to_dict('records'), timeframe
+                )
+                
+                # أوقف التحليل إذا استغرق أكثر من 3 ثواني
+                if time.time() - start_time > 3:  # قلل من 5 إلى 3
+                    logger.warning(f"Market analysis took too long: {time.time() - start_time:.1f}s")
+                    return self._simple_prediction(df)
+                
+                # احفظ في cache
+                self.analysis_cache[f"{symbol}_{timeframe}_{candles_hash}"] = (
+                    market_context, datetime.now()
+                )
             
             if not market_context:
                 logger.warning("Failed to analyze market context")
@@ -617,9 +653,13 @@ class EnhancedMLTradingSystem:
             
             for model_name, model in selected_models.items():
                 try:
-                    pred = model.predict(X_scaled)[0]
-                    prob = model.predict_proba(X_scaled)[0]
-                    confidence = max(prob)
+                    if hasattr(model, 'predict_proba'):
+                        prob = model.predict_proba(X_scaled)[0]
+                        pred = np.argmax(prob)
+                        confidence = max(prob)
+                    else:
+                        pred = model.predict(X_scaled)[0]
+                        confidence = 0.6
                     
                     predictions.append(pred)
                     confidences.append(confidence)
@@ -1802,8 +1842,8 @@ def predict():
         
         system.request_counter[model_key] += 1
         
-        # تدريب إذا: لا توجد نماذج، أو كل 50 طلب
-        should_train = (model_key not in system.models) or (system.request_counter[model_key] % 50 == 0)
+        # تدريب إذا: لا توجد نماذج، أو كل 200 طلب
+        should_train = (model_key not in system.models) or (system.request_counter[model_key] % 200 == 0)
         
         if should_train and len(candles) >= 500:
             logger.info(f"   🤖 Auto-training triggered for {clean_symbol} {timeframe}")
@@ -1948,6 +1988,11 @@ def predict():
             logger.info(f"   💰 Lot size: {sl_tp_info.get('lot_size', 0):.2f}")
         else:
             logger.info(f"   ⏸️ No trade signal")
+        
+        # تنظيف الذاكرة بعد كل 50 طلب
+        if system.request_counter.get(model_key, 0) % 50 == 0:
+            gc.collect()
+            logger.info("   🧹 Memory cleanup performed")
         
         return jsonify(response)
         
@@ -2353,4 +2398,4 @@ if __name__ == '__main__':
     
     logger.info("\n🎆 Server ready for intelligent trading!\n")
     
-    app.run(host='0.0.0.0', port=5000, debug=False)
+    app.run(host='0.0.0.0', port=5000, debug=False, threaded=True)
