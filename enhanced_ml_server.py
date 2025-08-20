@@ -123,6 +123,11 @@ class EnhancedMLTradingSystem:
         logger.info(f"   🤖 ML Models: {total_models} loaded ({len(self.models)} pairs)")
         if enhanced_models > 0:
             logger.info(f"   💪 Using advanced models (6-model ensemble)")
+        elif total_models == 0:
+            logger.warning(f"   ⚠️ No ML models loaded! Using simple strategy only.")
+            logger.warning(f"   💡 Train models for better performance:")
+            logger.warning(f"      curl -X POST http://localhost:5000/train -H 'Content-Type: application/json' -d '{\"symbol\": \"EURUSD\", \"timeframe\": \"M15\"}'")
+            logger.warning(f"      Replace EURUSD with your symbol (GBPUSD, USDJPY, etc.)")
     
     def calculate_enhanced_features(self, df, market_context=None):
         """حساب الميزات المحسنة مع سياق السوق"""
@@ -1480,9 +1485,20 @@ class EnhancedMLTradingSystem:
             
             logger.info(f"   📊 Simple Analysis: SMA10={sma10:.5f}, SMA20={sma20:.5f}, RSI={rsi:.1f}, Momentum={momentum:.2f}%")
             
+            # حساب ATR بسيط للـ SL/TP
+            high_low = df['high'] - df['low']
+            atr = high_low.rolling(14).mean().iloc[-1]
+            
+            # SL = 1.5 ATR, TP = 2 ATR
+            sl_distance = atr * 1.5
+            tp_distance = atr * 2
+            
             # قرار الشراء
             if close > sma10 and sma10 > sma20 and rsi < 70 and momentum > 0:
                 confidence = 0.60 if rsi < 60 else 0.58
+                sl_price = close - sl_distance
+                tp_price = close + tp_distance
+                
                 return {
                     'action': 0,
                     'direction': 'BUY',
@@ -1490,11 +1506,18 @@ class EnhancedMLTradingSystem:
                     'market_context': None,
                     'buy_votes': 1,
                     'total_votes': 1,
-                    'models_used': ['simple_strategy']
+                    'models_used': ['simple_strategy'],
+                    'sl_price': float(sl_price),
+                    'tp_price': float(tp_price),
+                    'sl_pips': float(sl_distance / 0.0001),
+                    'tp_pips': float(tp_distance / 0.0001)
                 }
             # قرار البيع
             elif close < sma10 and sma10 < sma20 and rsi > 30 and momentum < 0:
                 confidence = 0.60 if rsi > 40 else 0.58
+                sl_price = close + sl_distance
+                tp_price = close - tp_distance
+                
                 return {
                     'action': 1,
                     'direction': 'SELL',
@@ -1502,7 +1525,11 @@ class EnhancedMLTradingSystem:
                     'market_context': None,
                     'buy_votes': 0,
                     'total_votes': 1,
-                    'models_used': ['simple_strategy']
+                    'models_used': ['simple_strategy'],
+                    'sl_price': float(sl_price),
+                    'tp_price': float(tp_price),
+                    'sl_pips': float(sl_distance / 0.0001),
+                    'tp_pips': float(tp_distance / 0.0001)
                 }
             else:
                 # حتى في HOLD، نعطي اتجاه محتمل
@@ -1891,10 +1918,31 @@ def predict():
         current_price = float(df['close'].iloc[-1])
         
         if action != 'HOLD' and confidence >= 0.58:  # خفضنا إلى 0.58
-            # Check risk management approval
-            sl_tp_info = system.calculate_dynamic_sl_tp(
-                clean_symbol, action, current_price, market_context
-            )
+            # Check if sl_price/tp_price already provided from simple prediction
+            if 'sl_price' in prediction_result and 'tp_price' in prediction_result:
+                # Use SL/TP from simple prediction
+                sl_tp_info = {
+                    'sl_price': prediction_result['sl_price'],
+                    'tp0_price': prediction_result['tp_price'] * 0.5 + current_price * 0.5,  # TP0 at 50%
+                    'tp1_price': prediction_result['tp_price'],
+                    'tp2_price': prediction_result['tp_price'] * 1.5 - current_price * 0.5,  # Extended TP
+                    'sl_pips': prediction_result['sl_pips'],
+                    'tp0_pips': prediction_result['tp_pips'] * 0.5,
+                    'tp1_pips': prediction_result['tp_pips'],
+                    'tp2_pips': prediction_result['tp_pips'] * 1.5,
+                    'risk_reward_ratio': prediction_result['tp_pips'] / prediction_result['sl_pips'],
+                    'partial_close_info': {
+                        'tp0_percentage': 50,
+                        'tp1_percentage': 30,
+                        'tp2_percentage': 20
+                    }
+                }
+                logger.info("   📊 Using SL/TP from simple strategy")
+            else:
+                # Calculate SL/TP with market context
+                sl_tp_info = system.calculate_dynamic_sl_tp(
+                    clean_symbol, action, current_price, market_context
+                )
             
             # Validate trade with risk manager
             lot_size, risk_message = system.risk_manager.calculate_position_size(
