@@ -126,7 +126,7 @@ class EnhancedMLTradingSystem:
         elif total_models == 0:
             logger.warning(f"   ⚠️ No ML models loaded! Using simple strategy only.")
             logger.warning(f"   💡 Train models for better performance:")
-            logger.warning(f"      curl -X POST http://localhost:5000/train -H 'Content-Type: application/json' -d '{\"symbol\": \"EURUSD\", \"timeframe\": \"M15\"}'")
+            logger.warning('      curl -X POST http://localhost:5000/train -H "Content-Type: application/json" -d \'{"symbol": "EURUSD", "timeframe": "M15"}\'')
             logger.warning(f"      Replace EURUSD with your symbol (GBPUSD, USDJPY, etc.)")
     
     def calculate_enhanced_features(self, df, market_context=None):

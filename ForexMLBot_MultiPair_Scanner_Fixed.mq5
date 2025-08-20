@@ -423,6 +423,15 @@ void ExecuteTrade(string symbol, string action, double sl, double tp1, double tp
     double lotSize = CalculateLotSize(symbol, sl);
     if(lotSize <= 0) return;
     
+    // طباعة تفاصيل الصفقة قبل التنفيذ
+    Print("📊 Trade Setup for ", symbol, ":");
+    Print("   Action: ", action);
+    Print("   Current Price: ", SymbolInfoDouble(symbol, SYMBOL_BID));
+    Print("   SL: ", sl, " (", MathAbs(SymbolInfoDouble(symbol, SYMBOL_BID) - sl) / SymbolInfoDouble(symbol, SYMBOL_POINT), " points)");
+    Print("   TP: ", tp1);
+    Print("   Lot Size: ", lotSize);
+    Print("   Risk: ", AccountInfoDouble(ACCOUNT_BALANCE) * RiskPercent / 100.0, " ", AccountInfoString(ACCOUNT_CURRENCY));
+    
     // استخدام الدالة المحسنة مع إعادة المحاولة
     bool result = false;
     if(action == "BUY")
@@ -441,29 +450,112 @@ void ExecuteTrade(string symbol, string action, double sl, double tp1, double tp
 }
 
 //+------------------------------------------------------------------+
-//| حساب حجم الصفقة                                                  |
+//| حساب حجم الصفقة المحسن - يدعم جميع الأصول والمنصات             |
 //+------------------------------------------------------------------+
 double CalculateLotSize(string symbol, double sl_price)
 {
-    double price = SymbolInfoDouble(symbol, SYMBOL_BID);
-    double point = SymbolInfoDouble(symbol, SYMBOL_POINT);
-    double sl_points = MathAbs(price - sl_price) / point;
-    
+    // الحصول على معلومات الحساب والرمز
     double accountBalance = AccountInfoDouble(ACCOUNT_BALANCE);
-    double riskAmount = accountBalance * RiskPercent / 100;
+    double riskAmount = accountBalance * RiskPercent / 100.0;
     
+    // الحصول على السعر الحالي
+    double price = SymbolInfoDouble(symbol, SYMBOL_BID);
+    
+    // حساب المسافة بالنقاط
+    double point = SymbolInfoDouble(symbol, SYMBOL_POINT);
+    double digits = SymbolInfoInteger(symbol, SYMBOL_DIGITS);
+    
+    // حساب عدد النقاط للستوب لوس
+    double sl_distance = MathAbs(price - sl_price);
+    double sl_pips;
+    
+    // التعامل مع العملات والذهب والمؤشرات
+    string baseSymbol = StringSubstr(symbol, 0, 6); // أول 6 أحرف
+    
+    // تحديد نوع الأصل وحساب النقاط
+    if(StringFind(symbol, "XAU") >= 0 || StringFind(symbol, "GOLD") >= 0)
+    {
+        // الذهب - عادة 2 أرقام عشرية
+        sl_pips = sl_distance / 0.1; // pip للذهب = 0.1
+    }
+    else if(StringFind(symbol, "JPY") >= 0)
+    {
+        // أزواج الين - 2 أو 3 أرقام عشرية
+        if(digits == 3)
+            sl_pips = sl_distance / 0.01;
+        else
+            sl_pips = sl_distance / 0.01;
+    }
+    else
+    {
+        // العملات العادية - 4 أو 5 أرقام عشرية
+        if(digits == 5)
+            sl_pips = sl_distance / 0.0001;
+        else if(digits == 4)
+            sl_pips = sl_distance / 0.0001;
+        else
+            sl_pips = sl_distance / point / 10;
+    }
+    
+    // حساب قيمة النقطة
     double tickValue = SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_VALUE);
-    double lotSize = riskAmount / (sl_points * tickValue);
+    double tickSize = SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_SIZE);
+    double contractSize = SymbolInfoDouble(symbol, SYMBOL_TRADE_CONTRACT_SIZE);
     
-    // تطبيق الحدود
+    // حساب قيمة النقطة للوت الواحد
+    double pipValue;
+    if(tickValue != 0 && tickSize != 0)
+    {
+        pipValue = (tickValue / tickSize) * point * 10;
+    }
+    else
+    {
+        // حساب بديل
+        pipValue = contractSize * point * 10;
+        // تحويل للعملة الأساسية إذا لزم
+        string profitCurrency = SymbolInfoString(symbol, SYMBOL_CURRENCY_PROFIT);
+        if(profitCurrency != AccountInfoString(ACCOUNT_CURRENCY))
+        {
+            pipValue = pipValue / price;
+        }
+    }
+    
+    // حساب حجم اللوت
+    double lotSize = 0.01; // قيمة افتراضية
+    
+    if(sl_pips > 0 && pipValue > 0)
+    {
+        lotSize = riskAmount / (sl_pips * pipValue);
+    }
+    
+    // الحصول على قيود البروكر
     double minLot = SymbolInfoDouble(symbol, SYMBOL_VOLUME_MIN);
     double maxLot = SymbolInfoDouble(symbol, SYMBOL_VOLUME_MAX);
     double lotStep = SymbolInfoDouble(symbol, SYMBOL_VOLUME_STEP);
     
-    lotSize = MathFloor(lotSize / lotStep) * lotStep;
+    // تحديد حد أقصى آمن
+    double safeLotSize = MathMin(maxLot, accountBalance / 10000); // حد أقصى آمن
+    maxLot = MathMin(maxLot, safeLotSize);
+    
+    // تقريب حجم اللوت حسب الخطوة
+    lotSize = MathRound(lotSize / lotStep) * lotStep;
+    
+    // التأكد من الحدود
     lotSize = MathMax(minLot, MathMin(maxLot, lotSize));
     
-    return lotSize;
+    // طباعة للتحقق
+    if(EnableLogging)
+    {
+        Print("💰 Lot Size Calculation for ", symbol, ":");
+        Print("   Balance: ", accountBalance);
+        Print("   Risk Amount: ", riskAmount);
+        Print("   SL Distance: ", sl_distance);
+        Print("   SL Pips: ", sl_pips);
+        Print("   Pip Value: ", pipValue);
+        Print("   Calculated Lot: ", lotSize);
+    }
+    
+    return NormalizeDouble(lotSize, 2);
 }
 
 //+------------------------------------------------------------------+
