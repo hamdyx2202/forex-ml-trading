@@ -81,7 +81,7 @@ class EnhancedMLTradingSystem:
         self.risk_manager = RiskManagementSystem(initial_balance=10000)
         
         # Trading parameters - محدثة للربحية
-        self.min_confidence = 0.70  # رفع من 0.55 إلى 0.70
+        self.min_confidence = 0.58  # خفض من 0.70 إلى 0.58 (النماذج نادراً ما تعطي > 70%)
         self.min_market_score = 40  # رفع من 20 إلى 40
         self.max_daily_trades = 10  # حد أقصى للصفقات اليومية
         self.trade_cooldown = {}    # فترة انتظار بين الصفقات
@@ -1197,8 +1197,8 @@ class EnhancedMLTradingSystem:
                 action = 2  # HOLD
                 direction = 'HOLD'
             
-            # Override if confidence too low - رفعنا إلى 0.70
-            if final_confidence < 0.70:
+            # Override if confidence too low - خفضنا إلى 0.58
+            if final_confidence < 0.58:
                 action = 2  # HOLD
                 direction = 'HOLD'
                 logger.info(f"   ⚠️ HOLD due to low confidence: {final_confidence:.1%}")
@@ -1850,7 +1850,7 @@ def predict():
         # Determine signal with risk management
         current_price = float(df['close'].iloc[-1])
         
-        if action != 'HOLD' and confidence >= 0.70:  # رفعنا إلى 0.70
+        if action != 'HOLD' and confidence >= 0.58:  # خفضنا إلى 0.58
             # Check risk management approval
             sl_tp_info = system.calculate_dynamic_sl_tp(
                 clean_symbol, action, current_price, market_context
@@ -1894,8 +1894,8 @@ def predict():
             logger.info(f"   ⚠️ No trade: action={action}, confidence={confidence:.1%}")
             if action == 'HOLD':
                 logger.info(f"      Reason: Model voted HOLD")
-            elif confidence < 0.70:
-                logger.info(f"      Reason: Low confidence ({confidence:.1%} < 70%)")
+            elif confidence < 0.58:
+                logger.info(f"      Reason: Low confidence ({confidence:.1%} < 58%)")
             
             action = 'NONE'
             sl_tp_info = {
@@ -2117,7 +2117,7 @@ def backtest():
             current_time = window_df.index[-1]
             
             # Check if we should open a position
-            if position is None and prediction['direction'] != 'HOLD' and prediction['confidence'] >= 0.70:
+            if position is None and prediction['direction'] != 'HOLD' and prediction['confidence'] >= 0.58:
                 # Calculate position size (1% risk)
                 risk_amount = balance * 0.01
                 
