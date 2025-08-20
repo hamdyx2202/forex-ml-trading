@@ -786,10 +786,19 @@ class EnhancedMLTradingSystem:
                     n_jobs=-1
                 )
                 et.fit(X_train_scaled, y_train)
-                acc = et.score(X_test_scaled, y_test)
-                models['extra_trees'] = et
-                accuracies['extra_trees'] = acc
-                logger.info(f"   ✅ Extra Trees: {acc:.4f}")
+                y_pred = et.predict(X_test_scaled)
+                metrics = self.calculate_trading_metrics(y_test, y_pred, prices_test)
+                
+                if metrics['total_return'] > 0 and metrics['profit_factor'] > 1:
+                    model_performances.append({
+                        'model': 'extra_trees',
+                        'fold': fold,
+                        'metrics': metrics,
+                        'instance': et
+                    })
+                    logger.info(f"   ✅ Extra Trees: Return={metrics['total_return']:.2f}, PF={metrics['profit_factor']:.2f}")
+                else:
+                    logger.info(f"   ❌ Extra Trees: Unprofitable")
             except Exception as e:
                 logger.error(f"   ❌ Extra Trees: {e}")
             
@@ -806,10 +815,19 @@ class EnhancedMLTradingSystem:
                     random_state=42
                 )
                 nn.fit(X_train_scaled, y_train)
-                acc = nn.score(X_test_scaled, y_test)
-                models['neural_network'] = nn
-                accuracies['neural_network'] = acc
-                logger.info(f"   ✅ Neural Network: {acc:.4f}")
+                y_pred = nn.predict(X_test_scaled)
+                metrics = self.calculate_trading_metrics(y_test, y_pred, prices_test)
+                
+                if metrics['total_return'] > 0 and metrics['profit_factor'] > 1:
+                    model_performances.append({
+                        'model': 'neural_network',
+                        'fold': fold,
+                        'metrics': metrics,
+                        'instance': nn
+                    })
+                    logger.info(f"   ✅ Neural Network: Return={metrics['total_return']:.2f}, PF={metrics['profit_factor']:.2f}")
+                else:
+                    logger.info(f"   ❌ Neural Network: Unprofitable")
             except Exception as e:
                 logger.error(f"   ❌ Neural Network: {e}")
             
@@ -827,10 +845,19 @@ class EnhancedMLTradingSystem:
                         verbosity=-1
                     )
                     lgbm.fit(X_train_scaled, y_train)
-                    acc = lgbm.score(X_test_scaled, y_test)
-                    models['lightgbm'] = lgbm
-                    accuracies['lightgbm'] = acc
-                    logger.info(f"   ✅ LightGBM: {acc:.4f}")
+                    y_pred = lgbm.predict(X_test_scaled)
+                    metrics = self.calculate_trading_metrics(y_test, y_pred, prices_test)
+                    
+                    if metrics['total_return'] > 0 and metrics['profit_factor'] > 1:
+                        model_performances.append({
+                            'model': 'lightgbm',
+                            'fold': fold,
+                            'metrics': metrics,
+                            'instance': lgbm
+                        })
+                        logger.info(f"   ✅ LightGBM: Return={metrics['total_return']:.2f}, PF={metrics['profit_factor']:.2f}")
+                    else:
+                        logger.info(f"   ❌ LightGBM: Unprofitable")
                 except Exception as e:
                     logger.error(f"   ❌ LightGBM: {e}")
             
@@ -847,10 +874,19 @@ class EnhancedMLTradingSystem:
                         use_label_encoder=False
                     )
                     xgb_model.fit(X_train_scaled, y_train)
-                    acc = xgb_model.score(X_test_scaled, y_test)
-                    models['xgboost'] = xgb_model
-                    accuracies['xgboost'] = acc
-                    logger.info(f"   ✅ XGBoost: {acc:.4f}")
+                    y_pred = xgb_model.predict(X_test_scaled)
+                    metrics = self.calculate_trading_metrics(y_test, y_pred, prices_test)
+                    
+                    if metrics['total_return'] > 0 and metrics['profit_factor'] > 1:
+                        model_performances.append({
+                            'model': 'xgboost',
+                            'fold': fold,
+                            'metrics': metrics,
+                            'instance': xgb_model
+                        })
+                        logger.info(f"   ✅ XGBoost: Return={metrics['total_return']:.2f}, PF={metrics['profit_factor']:.2f}")
+                    else:
+                        logger.info(f"   ❌ XGBoost: Unprofitable")
                 except Exception as e:
                     logger.error(f"   ❌ XGBoost: {e}")
             
@@ -1016,8 +1052,8 @@ class EnhancedMLTradingSystem:
                 action = 2  # HOLD
                 direction = 'HOLD'
             
-            # Override if confidence too low - خفضنا من 0.65 إلى 0.55
-            if final_confidence < 0.55:
+            # Override if confidence too low - رفعنا إلى 0.70
+            if final_confidence < 0.70:
                 action = 2  # HOLD
                 direction = 'HOLD'
                 logger.info(f"   ⚠️ HOLD due to low confidence: {final_confidence:.1%}")
@@ -1664,7 +1700,7 @@ def predict():
         # Determine signal with risk management
         current_price = float(df['close'].iloc[-1])
         
-        if action != 'HOLD' and confidence >= 0.55:  # خفضنا من 0.65 إلى 0.55
+        if action != 'HOLD' and confidence >= 0.70:  # رفعنا إلى 0.70
             # Check risk management approval
             sl_tp_info = system.calculate_dynamic_sl_tp(
                 clean_symbol, action, current_price, market_context
@@ -1708,8 +1744,8 @@ def predict():
             logger.info(f"   ⚠️ No trade: action={action}, confidence={confidence:.1%}")
             if action == 'HOLD':
                 logger.info(f"      Reason: Model voted HOLD")
-            elif confidence < 0.55:
-                logger.info(f"      Reason: Low confidence ({confidence:.1%} < 55%)")
+            elif confidence < 0.70:
+                logger.info(f"      Reason: Low confidence ({confidence:.1%} < 70%)")
             
             action = 'NONE'
             sl_tp_info = {
