@@ -158,6 +158,11 @@ class EnhancedMLTradingSystem:
             # Overall market score
             features['market_score'] = market_context.get('score', 0)
         
+        # Ensure all values are scalar (not arrays or lists)
+        for col in features.columns:
+            if isinstance(features[col].iloc[-1], (list, np.ndarray)):
+                features[col] = features[col].apply(lambda x: x[0] if isinstance(x, (list, np.ndarray)) and len(x) > 0 else 0)
+        
         return features
     
     def _score_volume_signal(self, signal):
@@ -261,16 +266,20 @@ class EnhancedMLTradingSystem:
                     # Calculate features with context
                     features = self.calculate_enhanced_features(chunk, market_context)
                     
-                    if not features.empty:
-                        # Get the last feature row
-                        X_list.append(features.iloc[-1].values)
+                    if not features.empty and len(features) > 0:
+                        # Get the last feature row and ensure it's 1D
+                        feature_values = features.iloc[-1].values
                         
-                        # Target: price movement in next candle
-                        future_return = (df['close'].iloc[i+1] - df['close'].iloc[i]) / df['close'].iloc[i]
-                        y_list.append(1 if future_return > 0 else 0)
-                        
-                        # Store market score for filtering
-                        market_scores.append(market_context['score'])
+                        # Ensure consistent shape
+                        if isinstance(feature_values, np.ndarray) and feature_values.ndim == 1:
+                            X_list.append(feature_values)
+                            
+                            # Target: price movement in next candle
+                            future_return = (df['close'].iloc[i+1] - df['close'].iloc[i]) / df['close'].iloc[i]
+                            y_list.append(1 if future_return > 0 else 0)
+                            
+                            # Store market score for filtering
+                            market_scores.append(market_context['score'])
             
             if len(X_list) < 100:  # خفضنا من 500 إلى 100
                 logger.warning(f"Not enough training samples: {len(X_list)} < 100")
@@ -278,10 +287,29 @@ class EnhancedMLTradingSystem:
             
             logger.info(f"   ✅ Prepared {len(X_list)} training samples")
             
+            # Check feature consistency
+            if len(X_list) > 0:
+                feature_counts = [len(x) for x in X_list]
+                if len(set(feature_counts)) > 1:
+                    logger.warning(f"Inconsistent feature sizes: {set(feature_counts)}")
+                    # Keep only samples with the most common feature count
+                    most_common_size = max(set(feature_counts), key=feature_counts.count)
+                    valid_indices = [i for i, x in enumerate(X_list) if len(x) == most_common_size]
+                    
+                    X_list = [X_list[i] for i in valid_indices]
+                    y_list = [y_list[i] for i in valid_indices]
+                    market_scores = [market_scores[i] for i in valid_indices]
+                    
+                    logger.info(f"   📊 Filtered to {len(X_list)} samples with {most_common_size} features")
+            
             # Convert to arrays
-            X = np.array(X_list)
-            y = np.array(y_list)
-            market_scores = np.array(market_scores)
+            try:
+                X = np.array(X_list)
+                y = np.array(y_list)
+                market_scores = np.array(market_scores)
+            except Exception as e:
+                logger.error(f"Error converting to arrays: {e}")
+                return False
             
             logger.info(f"   📊 Created {len(X)} training samples")
             
